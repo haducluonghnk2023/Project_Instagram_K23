@@ -1,4 +1,4 @@
-import { Button } from "@/components/common";
+﻿import { Button } from "@/components/common";
 import {
   PostGrid,
   ProfileTabs,
@@ -31,6 +31,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ConfirmDialog } from "@/components/common";
 import { useToast } from "@/components/common/ToastProvider";
 import { showErrorFromException } from "@/utils/toast";
+import { SwipeBackView } from '@/components/common';
 
 export default function ProfileTab() {
   const [activeTab, setActiveTab] = useState<TabType>("grid");
@@ -161,22 +162,24 @@ export default function ProfileTab() {
             showToast("Đã cập nhật ảnh đại diện!", "success");
             refetch(); // Refresh để hiển thị ảnh mới
           },
-          onError: (error: any) => {
-            const { message } = showErrorFromException(error, "Không thể cập nhật ảnh đại diện");
-            showToast(message, "error");
+          onError: (error: unknown) => {
+            const errorMessage = getErrorMessage(error);
+            showToast(errorMessage || "Không thể cập nhật ảnh đại diện", "error");
           },
         }
       );
-    } catch (error: any) {
-      const { message } = showErrorFromException(error, "Không thể upload ảnh");
-      showToast(message, "error");
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể upload ảnh', 'error');
     } finally {
       setIsUploadingAvatar(false);
     }
   };
 
   const handlePostPress = (post: any) => {
-    router.push(`/post/detail/${post.id}`);
+    // Truyền thông tin về nơi đến từ đâu để biết back về đâu
+    const profilePath = '/(tabs)/profile';
+    router.push(`/post/detail/${post.id}?from=${encodeURIComponent(profilePath)}`);
   };
 
   // Hiển thị loading khi đang check auth
@@ -241,7 +244,8 @@ export default function ProfileTab() {
   }
 
   return (
-    <ThemedView style={CommonStyles.container}>
+    <SwipeBackView enabled={true} style={CommonStyles.container}>
+      <ThemedView style={CommonStyles.container}>
       <SafeAreaView edges={["top"]} style={CommonStyles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -292,7 +296,7 @@ export default function ProfileTab() {
                 </View>
                 <TouchableOpacity 
                   style={styles.statItem}
-                  onPress={() => router.push('/(tabs)/friend')}
+                  onPress={() => router.push('/profile/followers')}
                 >
                   <Text style={styles.statNumber}>{String(followersCount)}</Text>
                   <Text style={styles.statLabel}>người theo dõi</Text>
@@ -400,7 +404,8 @@ export default function ProfileTab() {
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
       />
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

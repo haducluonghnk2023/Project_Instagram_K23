@@ -3,8 +3,11 @@ import { Platform } from "react-native";
 import { Colors } from "@/constants/colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tabs
       screenOptions={{
@@ -12,11 +15,16 @@ export default function TabsLayout() {
         tabBarActiveTintColor: "#000",
         tabBarInactiveTintColor: "#000",
         tabBarStyle: Platform.select({
-          ios: { height: 88 },
+          ios: { 
+            height: 88 + (insets.bottom > 0 ? 0 : 8),
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          },
           default: {
             backgroundColor: "#e2cdcdff",
             borderTopWidth: 0.5,
             borderTopColor: "#e0e0e0",
+            paddingBottom: Math.max(insets.bottom, 8),
+            height: 60 + Math.max(insets.bottom, 8),
           },
         }),
       }}

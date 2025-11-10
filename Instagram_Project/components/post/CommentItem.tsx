@@ -206,9 +206,12 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
               </Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={handleReplyPress}>
-            <Text style={styles.replyText}>Phản hồi</Text>
-          </TouchableOpacity>
+          {/* Chỉ hiển thị nút "Phản hồi" nếu không phải là reply (chỉ cho phép 2 cấp) */}
+          {!isReply && (
+            <TouchableOpacity onPress={handleReplyPress}>
+              <Text style={styles.replyText}>Phản hồi</Text>
+            </TouchableOpacity>
+          )}
           {isOwnComment && (
             <TouchableOpacity onPress={handleDelete}>
               <Ionicons name="trash-outline" size={16} color={Colors.error} />

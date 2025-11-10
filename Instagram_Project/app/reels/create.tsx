@@ -25,6 +25,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Video, ResizeMode } from "expo-av";
 import { useToast } from "@/components/common/ToastProvider";
 import { showErrorFromException } from "@/utils/toast";
+import { SwipeBackView } from "@/components/common";
 
 export default function CreateReelScreen() {
   const { mutate: createPost, isPending } = useCreatePost();
@@ -164,11 +165,21 @@ export default function CreateReelScreen() {
   };
 
   return (
-    <ThemedView style={CommonStyles.container}>
+    <SwipeBackView enabled={true} style={CommonStyles.container}>
+      <ThemedView style={CommonStyles.container}>
       <SafeAreaView edges={["top"]} style={CommonStyles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/home');
+              }
+            }} 
+            style={styles.backButton}
+          >
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <ThemedText type="title" style={styles.headerTitle}>
@@ -358,7 +369,8 @@ export default function CreateReelScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

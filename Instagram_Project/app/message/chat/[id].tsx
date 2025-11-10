@@ -26,8 +26,11 @@ import { useReactToMessage, useRemoveReaction } from '@/hooks/useMessageReaction
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Message } from '@/types/message';
 import { router, useLocalSearchParams } from 'expo-router';
+import { SwipeBackView, useToast } from '@/components/common';
 import { useMe } from '@/hooks/useAuth';
 import { uploadImageApi, uploadVideoApi } from '@/services/upload.api';
+import { getErrorMessage } from '@/utils/error';
+import { logger } from '@/utils/logger';
 import { 
   showImagePickerOptions, 
   pickImageFromLibrary, 
@@ -73,6 +76,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         />
       )}
       <View style={[styles.messageBubble, isOwn && styles.messageBubbleOwn]}>
+        {/* Read Status Indicator - Vòng tròn nhỏ ở góc */}
+        {isOwn && (
+          <View style={styles.readStatusIndicator}>
+            <View style={[
+              styles.readStatusDot,
+              message.isRead && styles.readStatusDotRead
+            ]} />
+          </View>
+        )}
+        
         {/* Media */}
         {message.media && message.media.length > 0 && (
           <View style={styles.messageMediaContainer}>
@@ -174,6 +187,7 @@ export default function ChatDetailScreen() {
   const { mutate: markAllAsRead } = useMarkAllAsRead();
   const { mutate: reactToMessage } = useReactToMessage();
   const { mutate: removeReaction } = useRemoveReaction();
+  const { showToast } = useToast();
 
   const [messageText, setMessageText] = useState('');
   // Chỉ lưu URI local, không upload ngay
@@ -189,11 +203,18 @@ export default function ChatDetailScreen() {
   // Enable WebSocket for real-time updates
   useWebSocket(true);
 
+  // Xử lý trường hợp tự nhắn tin (self-messaging)
   const otherUser = messages && messages.length > 0 
     ? (messages[0].fromUserId === currentUser?.id ? messages[0].toUser : messages[0].fromUser)
     : null;
-  const displayName = otherUser?.profile?.fullName || otherUser?.email || 'Người dùng';
-  const avatarUrl = otherUser?.profile?.avatarUrl || null;
+  // Nếu tự nhắn tin, hiển thị thông tin của chính mình
+  const isSelfChat = id === currentUser?.id;
+  const displayName = isSelfChat 
+    ? (currentUser?.profile?.fullName || currentUser?.email || 'Ghi chú của tôi')
+    : (otherUser?.profile?.fullName || otherUser?.email || 'Người dùng');
+  const avatarUrl = isSelfChat 
+    ? (currentUser?.profile?.avatarUrl || null)
+    : (otherUser?.profile?.avatarUrl || null);
 
   useEffect(() => {
     if (id && currentUser?.id) {
@@ -250,7 +271,7 @@ export default function ChatDetailScreen() {
 
   const handleImageSelected = (imageUri: string) => {
     if (selectedImageUris.length >= 5) {
-      Alert.alert('Lỗi', 'Tối đa 5 ảnh');
+            showToast('Tối đa 5 ảnh', 'error');
       return;
     }
 
@@ -260,7 +281,7 @@ export default function ChatDetailScreen() {
 
   const handleVideoSelected = (videoUri: string) => {
     if (selectedVideoUris.length >= 3) {
-      Alert.alert('Lỗi', 'Tối đa 3 video');
+            showToast('Tối đa 3 video', 'error');
       return;
     }
 
@@ -293,8 +314,8 @@ export default function ChatDetailScreen() {
           try {
             const url = await uploadImageApi(uri, 'instagram/messages');
             return url;
-          } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể upload ảnh');
+          } catch (error: unknown) {
+            showToast(getErrorMessage(error) || 'Không thể upload ảnh', 'error');
             return null;
           }
         });
@@ -307,8 +328,8 @@ export default function ChatDetailScreen() {
           try {
             const url = await uploadVideoApi(uri, 'instagram/messages');
             return url;
-          } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể upload video');
+          } catch (error: unknown) {
+            showToast(getErrorMessage(error) || 'Không thể upload video', 'error');
             return null;
           }
         });
@@ -340,30 +361,16 @@ export default function ChatDetailScreen() {
             setSelectedVideoUris([]);
             refetch();
           },
-          onError: (error: any) => {
-            console.error('Send message error:', error);
-            let errorMessage = 'Không thể gửi tin nhắn';
-            
-            if (error?.response?.data?.data) {
-              if (typeof error.response.data.data === 'string') {
-                errorMessage = error.response.data.data;
-              } else if (typeof error.response.data.data === 'object') {
-                // Handle validation errors
-                const errors = Object.values(error.response.data.data).join(', ');
-                errorMessage = errors || errorMessage;
-              }
-            } else if (error?.response?.data?.message) {
-              errorMessage = error.response.data.message;
-            } else if (error?.message) {
-              errorMessage = error.message;
-            }
-            
-            Alert.alert('Lỗi', errorMessage);
+          onError: (error: unknown) => {
+            logger.error('Send message error:', error);
+            const errorMessage = getErrorMessage(error);
+            showToast(errorMessage, 'error');
           },
         }
       );
-    } catch (error: any) {
-      Alert.alert('Lỗi', error?.message || 'Không thể upload media');
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage, 'error');
     } finally {
       setIsUploading(false);
     }
@@ -420,7 +427,16 @@ export default function ChatDetailScreen() {
       <ThemedView style={styles.container}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <TouchableOpacity 
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/messages');
+                }
+              }} 
+              style={styles.backButton}
+            >
               <Ionicons name="arrow-back" size={24} color={Colors.text} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
@@ -437,11 +453,21 @@ export default function ChatDetailScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/messages');
+              }
+            }} 
+            style={styles.backButton}
+          >
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
@@ -457,9 +483,9 @@ export default function ChatDetailScreen() {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={0}
         >
           {/* Messages List */}
           <FlatList
@@ -511,7 +537,7 @@ export default function ChatDetailScreen() {
           )}
 
           {/* Input Area */}
-          <SafeAreaView edges={['bottom']} style={styles.inputWrapper}>
+          <View style={styles.inputWrapper}>
             <View style={styles.inputContainer}>
               <TouchableOpacity
                 style={styles.mediaButton}
@@ -548,7 +574,7 @@ export default function ChatDetailScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
+          </View>
         </KeyboardAvoidingView>
 
         {/* Emoji Picker Modal */}
@@ -609,7 +635,8 @@ export default function ChatDetailScreen() {
           </View>
         </Modal>
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 
@@ -678,11 +705,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomLeftRadius: 4,
+    position: 'relative',
   },
   messageBubbleOwn: {
     backgroundColor: Colors.primaryLight,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 4,
+  },
+  readStatusIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  readStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.textSecondary,
+    opacity: 0.5,
+  },
+  readStatusDotRead: {
+    backgroundColor: Colors.primary,
+    opacity: 1,
   },
   messageMediaContainer: {
     marginBottom: Spacing.xs,
@@ -839,13 +888,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    paddingBottom: Platform.OS === 'ios' ? 0 : Spacing.xs,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
     gap: Spacing.sm,
   },
   mediaButton: {

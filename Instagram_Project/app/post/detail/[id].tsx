@@ -24,9 +24,10 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { pickImageFromLibrary, takePhotoFromCamera, showImagePickerOptions } from "@/utils/imagePicker";
 import { uploadImageApi } from "@/services/upload.api";
+import { SwipeBackView } from "@/components/common";
 
 export default function PostDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { data: post, isLoading, error } = usePost(id as string);
   const { data: comments, isLoading: isLoadingComments } = usePostComments(id as string);
   const { mutate: createComment, isPending } = useCreateComment();
@@ -152,7 +153,17 @@ export default function PostDetailScreen() {
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (from) {
+                router.push(decodeURIComponent(from));
+              } else {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home');
+                }
+              }
+            }}
           >
             <Text style={styles.retryButtonText}>Quay lại</Text>
           </TouchableOpacity>
@@ -161,12 +172,37 @@ export default function PostDetailScreen() {
     );
   }
 
+  // Hàm xử lý back navigation
+  const handleBack = () => {
+    if (from) {
+      // Nếu có thông tin về nơi đến từ đâu, navigate về đó
+      const decodedFrom = decodeURIComponent(from);
+      // Kiểm tra xem có thể back được không, nếu không thì push
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push(decodedFrom);
+      }
+    } else {
+      // Nếu không có thông tin, thử back, nếu không được thì về home
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/home');
+      }
+    }
+  };
+
   return (
-    <ThemedView style={CommonStyles.container}>
-      <SafeAreaView edges={["top"]} style={CommonStyles.container}>
+    <SwipeBackView enabled={true} style={CommonStyles.container} onBack={handleBack}>
+      <ThemedView style={CommonStyles.container}>
+        <SafeAreaView edges={["top"]} style={CommonStyles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity 
+            onPress={handleBack}
+            style={styles.backButton}
+          >
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Bài viết</Text>
@@ -184,7 +220,13 @@ export default function PostDetailScreen() {
             keyboardShouldPersistTaps="handled"
           >
             {/* Post */}
-            <PostItem post={post} />
+            <PostItem 
+              post={post} 
+              onPostDeleted={() => {
+                // Khi xóa bài viết từ detail screen, quay về màn hình trước
+                handleBack();
+              }}
+            />
 
             {/* Comments Section */}
             <View style={styles.commentsSection}>
@@ -258,7 +300,8 @@ export default function PostDetailScreen() {
           </SafeAreaView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

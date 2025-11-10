@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import {
 } from '@/services/friend.api';
 import { router } from 'expo-router';
 import { useMe } from '@/hooks/useAuth';
+import { SwipeBackView, useToast } from '@/components/common';
+import { getErrorMessage } from '@/utils/error';
 
 interface FriendRequestItemProps {
   request: FriendRequestInfo;
@@ -114,6 +116,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
 };
 
 export default function FriendRequestsScreen() {
+  const { showToast } = useToast();
   const { data: currentUser, isLoading: isLoadingUser } = useMe();
   const [requests, setRequests] = useState<FriendRequestInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,11 +133,9 @@ export default function FriendRequestsScreen() {
     try {
       const data = await getFriendRequestsApi();
       setRequests(data || []);
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể tải lời mời kết bạn.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể tải lời mời kết bạn.', 'error');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -157,13 +158,11 @@ export default function FriendRequestsScreen() {
     setLoadingAction('accept');
     try {
       await acceptFriendRequestApi({ requestId });
-      Alert.alert('Thành công', 'Đã chấp nhận lời mời kết bạn');
+      showToast('Đã chấp nhận lời mời kết bạn', 'success');
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể chấp nhận lời mời.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể chấp nhận lời mời.', 'error');
     } finally {
       setLoadingAction(null);
     }
@@ -173,13 +172,11 @@ export default function FriendRequestsScreen() {
     setLoadingAction('reject');
     try {
       await rejectFriendRequestApi(requestId);
-      Alert.alert('Thành công', 'Đã từ chối lời mời kết bạn');
+      showToast('Đã từ chối lời mời kết bạn', 'success');
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể từ chối lời mời.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể từ chối lời mời.', 'error');
     } finally {
       setLoadingAction(null);
     }
@@ -189,13 +186,11 @@ export default function FriendRequestsScreen() {
     setLoadingAction('cancel');
     try {
       await cancelFriendRequestApi(requestId);
-      Alert.alert('Thành công', 'Đã hủy lời mời kết bạn');
+      showToast('Đã hủy lời mời kết bạn', 'success');
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể hủy lời mời.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể hủy lời mời.', 'error');
     } finally {
       setLoadingAction(null);
     }
@@ -238,8 +233,33 @@ export default function FriendRequestsScreen() {
 
   if (isLoading || isLoadingUser || !currentUser?.id) {
     return (
+      <SwipeBackView enabled={true} style={styles.container}>
+        <ThemedView style={styles.container}>
+          <SafeAreaView edges={['top']} style={styles.safeArea}>
+            <View style={styles.header}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Ionicons name="arrow-back" size={24} color={Colors.text} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Lời mời kết bạn</Text>
+              <View style={styles.backButton} />
+            </View>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          </SafeAreaView>
+        </ThemedView>
+      </SwipeBackView>
+    );
+  }
+
+  return (
+    <SwipeBackView enabled={true} style={styles.container}>
       <ThemedView style={styles.container}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
+          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
@@ -250,85 +270,64 @@ export default function FriendRequestsScreen() {
             <Text style={styles.headerTitle}>Lời mời kết bạn</Text>
             <View style={styles.backButton} />
           </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
-        </SafeAreaView>
-      </ThemedView>
-    );
-  }
 
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color={Colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Lời mời kết bạn</Text>
-          <View style={styles.backButton} />
-        </View>
-
-        {/* Tabs */}
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'incoming' && styles.tabActive]}
-            onPress={() => setActiveTab('incoming')}
-          >
-            <Text style={activeTab === 'incoming' ? styles.tabTextActive : styles.tabText}>
-              Đã nhận ({incomingRequests.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'outgoing' && styles.tabActive]} 
-            onPress={() => setActiveTab('outgoing')}
-          >
-            <Text style={activeTab === 'outgoing' ? styles.tabTextActive : styles.tabText}>
-              Đã gửi ({outgoingRequests.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Requests List */}
-        {(() => {
-          const displayRequests = activeTab === 'incoming' ? incomingRequests : outgoingRequests;
-          return displayRequests.length > 0 ? (
-            <FlatList
-              data={displayRequests}
-              renderItem={renderRequest}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={Colors.primary}
-                />
-              }
-            />
-          ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="person-add-outline" size={64} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>Không có lời mời kết bạn</Text>
-            <Text style={styles.emptySubtext}>
-              Tất cả lời mời kết bạn đã được xử lý
-            </Text>
+          {/* Tabs */}
+          <View style={styles.tabs}>
             <TouchableOpacity
-              style={styles.searchButton}
-              onPress={() => router.push('/(tabs)/search')}
+              style={[styles.tab, activeTab === 'incoming' && styles.tabActive]}
+              onPress={() => setActiveTab('incoming')}
             >
-              <Text style={styles.searchButtonText}>Tìm kiếm bạn bè</Text>
+              <Text style={activeTab === 'incoming' ? styles.tabTextActive : styles.tabText}>
+                Đã nhận ({incomingRequests.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tab, activeTab === 'outgoing' && styles.tabActive]} 
+              onPress={() => setActiveTab('outgoing')}
+            >
+              <Text style={activeTab === 'outgoing' ? styles.tabTextActive : styles.tabText}>
+                Đã gửi ({outgoingRequests.length})
+              </Text>
             </TouchableOpacity>
           </View>
-          );
-        })()}
+
+          {/* Requests List */}
+          {(() => {
+            const displayRequests = activeTab === 'incoming' ? incomingRequests : outgoingRequests;
+            return displayRequests.length > 0 ? (
+              <FlatList
+                data={displayRequests}
+                renderItem={renderRequest}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContent}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={Colors.primary}
+                  />
+                }
+              />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="person-add-outline" size={64} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Không có lời mời kết bạn</Text>
+                <Text style={styles.emptySubtext}>
+                  Tất cả lời mời kết bạn đã được xử lý
+                </Text>
+                <TouchableOpacity
+                  style={styles.searchButton}
+                  onPress={() => router.push('/(tabs)/search')}
+                >
+                  <Text style={styles.searchButtonText}>Tìm kiếm bạn bè</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

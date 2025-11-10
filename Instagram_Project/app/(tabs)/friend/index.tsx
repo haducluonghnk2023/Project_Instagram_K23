@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,37 +16,31 @@ import { ThemedView } from '@/components/themed-view';
 import { Avatar } from '@/components/common/Avatar';
 import { Colors } from '@/constants/colors';
 import { Spacing, FontSizes } from '@/constants/styles';
-import { getFriendsApi, unfriendApi, blockUserApi } from '@/services/friend.api';
+import { getFriendsApi, blockUserApi } from '@/services/friend.api';
 import { FriendInfo } from '@/services/friend.api';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { SwipeBackView } from '@/components/common';
+import { getErrorMessage } from '@/utils/error';
 
 interface FriendItemProps {
   friend: FriendInfo;
-  onUnfriend: (friendId: string, friendName: string) => void;
   onBlock: (userId: string, userName: string) => void;
   onViewProfile: (userId: string) => void;
 }
 
 const FriendItem: React.FC<FriendItemProps> = ({
   friend,
-  onUnfriend,
   onBlock,
   onViewProfile,
 }) => {
   const profile = friend.user.profile;
   const displayName = profile?.fullName || friend.user.email || friend.user.phone || 'Người dùng';
   const [showMenu, setShowMenu] = useState(false);
-  const [showUnfriendConfirm, setShowUnfriendConfirm] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
 
   const handleMenuPress = () => {
     setShowMenu(!showMenu);
-  };
-
-  const handleUnfriend = () => {
-    setShowMenu(false);
-    setShowUnfriendConfirm(true);
   };
 
   const handleBlock = () => {
@@ -90,13 +84,6 @@ const FriendItem: React.FC<FriendItemProps> = ({
         <View style={styles.menu}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={handleUnfriend}
-          >
-            <Ionicons name="person-remove-outline" size={20} color={Colors.text} />
-            <Text style={styles.menuItemText}>Hủy kết bạn</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuItem}
             onPress={handleBlock}
           >
             <Ionicons name="ban-outline" size={20} color={Colors.error} />
@@ -110,20 +97,6 @@ const FriendItem: React.FC<FriendItemProps> = ({
           </TouchableOpacity>
         </View>
       )}
-
-      <ConfirmDialog
-        visible={showUnfriendConfirm}
-        title="Hủy kết bạn"
-        message={`Bạn có chắc chắn muốn hủy kết bạn với ${displayName}?`}
-        confirmText="Xác nhận"
-        cancelText="Hủy"
-        type="warning"
-        onConfirm={() => {
-          setShowUnfriendConfirm(false);
-          onUnfriend(friend.id, displayName);
-        }}
-        onCancel={() => setShowUnfriendConfirm(false)}
-      />
 
       <ConfirmDialog
         visible={showBlockConfirm}
@@ -153,9 +126,9 @@ export default function FriendListScreen() {
     try {
       const data = await getFriendsApi();
       setFriends(data || []);
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Không thể tải danh sách bạn bè.';
-      showToast(errorMessage, "error");
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể tải danh sách bạn bè.', "error");
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -171,16 +144,6 @@ export default function FriendListScreen() {
     loadFriends();
   };
 
-  const handleUnfriend = async (friendId: string, friendName: string) => {
-    try {
-      await unfriendApi(friendId);
-      showToast(`Đã hủy kết bạn với ${friendName}`, "success");
-      setFriends((prev) => prev.filter((f) => f.id !== friendId));
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Không thể hủy kết bạn.';
-      showToast(errorMessage, "error");
-    }
-  };
 
   const handleBlock = async (userId: string, userName: string) => {
     try {
@@ -190,20 +153,19 @@ export default function FriendListScreen() {
       setFriends((prev) => prev.filter((f) => f.userId !== userId));
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['friends'] });
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Không thể chặn người dùng.';
-      showToast(errorMessage, "error");
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể chặn người dùng.', "error");
     }
   };
 
   const handleViewProfile = (userId: string) => {
-    router.push(`/message/chat/${userId}`);
+    router.push(`/profile?userId=${userId}`);
   };
 
   const renderFriend = ({ item }: { item: FriendInfo }) => (
     <FriendItem
       friend={item}
-      onUnfriend={handleUnfriend}
       onBlock={handleBlock}
       onViewProfile={handleViewProfile}
     />
@@ -211,6 +173,7 @@ export default function FriendListScreen() {
 
   if (isLoading) {
     return (
+      <SwipeBackView enabled={true} style={styles.container}>
       <ThemedView style={styles.container}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={styles.header}>
@@ -220,12 +183,14 @@ export default function FriendListScreen() {
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
         </SafeAreaView>
-      </ThemedView>
+        </ThemedView>
+      </SwipeBackView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -294,7 +259,8 @@ export default function FriendListScreen() {
           </View>
         )}
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

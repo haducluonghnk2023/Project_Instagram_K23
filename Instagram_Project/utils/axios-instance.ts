@@ -36,86 +36,109 @@ export const axiosInstance = axios.create({
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-  timeout: 15000,
+  timeout: 15000, // Default timeout for normal requests
+});
+
+// Instance for uploads with longer timeout
+export const uploadAxiosInstance = axios.create({
+  baseURL,
+  headers: {
+    Accept: "application/json",
+  },
+  timeout: 300000, // 5 minutes
 });
 
 export const setAuthToken = (token: string | null) => {
   if (token) {
     axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    uploadAxiosInstance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   } else {
     delete axiosInstance.defaults.headers.common["Authorization"];
+    delete uploadAxiosInstance.defaults.headers.common["Authorization"];
   }
 };
 
-axiosInstance.interceptors.request.use(
-  async (config) => {
-    if (!config.headers.Authorization) {
-      try {
-        const token = await AsyncStorage.getItem("token");
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+const setupRequestInterceptor = (instance: typeof axiosInstance) => {
+  instance.interceptors.request.use(
+    async (config) => {
+      if (!config.headers.Authorization) {
+        try {
+          const token = await AsyncStorage.getItem("token");
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        } catch (error) {
+          console.error("Error getting token from storage:", error);
         }
-      } catch (error) {
-        console.error("Error getting token from storage:", error);
-      }
-    }
-    
-    return config;
-  },
-  (error) => {
-    console.error("Request interceptor error:", error);
-    return Promise.reject(error);
-  }
-);
-
-axiosInstance.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const status = error.response?.status;
-    
-    // Handle timeout errors
-    if (error.code === "ECONNABORTED" || String(error?.message || "").includes("timeout")) {
-      return Promise.reject(new Error("Kết nối máy chủ quá thời gian. Vui lòng kiểm tra mạng hoặc thử lại."));
-    }
-    
-    // Handle network errors (no response from server)
-    // Axios network errors: ERR_NETWORK, ECONNREFUSED, ENOTFOUND, etc.
-    if (!error.response) {
-      const isNetworkError = 
-        error.code === 'ERR_NETWORK' ||
-        error.code === 'ECONNREFUSED' ||
-        error.code === 'ENOTFOUND' ||
-        error.code === 'ETIMEDOUT' ||
-        error.message?.includes('Network Error') ||
-        error.message?.includes('network');
-      
-      if (isNetworkError) {
-        return Promise.reject(new Error("Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng."));
       }
       
-      // Other errors without response - pass through original error
+      return config;
+    },
+    (error) => {
+      console.error("Request interceptor error:", error);
       return Promise.reject(error);
     }
-    
-    // Handle 401 Unauthorized
-    if (status === 401) {
-      // Token expired or invalid - clear it
-      try {
-        const { invalidateAuth } = await import("@/contexts/AuthContext");
-        await invalidateAuth();
-      } catch (e) {
-        // Fallback: clear token directly
-        try {
-          await AsyncStorage.removeItem("token");
-          setAuthToken(null);
-        } catch (err) {
-          console.error("Error clearing token:", err);
-        }
+  );
+};
+
+setupRequestInterceptor(axiosInstance);
+setupRequestInterceptor(uploadAxiosInstance);
+
+const setupResponseInterceptor = (instance: typeof axiosInstance) => {
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const status = error.response?.status;
+      
+      // Handle timeout errors
+      if (error.code === "ECONNABORTED" || String(error?.message || "").includes("timeout")) {
+        return Promise.reject(new Error("Kết nối máy chủ quá thời gian. Vui lòng kiểm tra mạng hoặc thử lại."));
       }
-      // Return a more user-friendly error
-      return Promise.reject(new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
+      
+      // Handle network errors (no response from server)
+      // Axios network errors: ERR_NETWORK, ECONNREFUSED, ENOTFOUND, etc.
+      if (!error.response) {
+        const isNetworkError = 
+          error.code === 'ERR_NETWORK' ||
+          error.code === 'ECONNREFUSED' ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ETIMEDOUT' ||
+          error.message?.includes('Network Error') ||
+          error.message?.includes('network') ||
+          error.message?.includes('EOFException') ||
+          error.message?.includes('ClientAbortException');
+        
+        if (isNetworkError) {
+          return Promise.reject(new Error("Kết nối bị ngắt. Vui lòng kiểm tra kết nối mạng và thử lại."));
+        }
+        
+        // Other errors without response - pass through original error
+        return Promise.reject(error);
+      }
+      
+      // Handle 401 Unauthorized
+      if (status === 401) {
+        // Token expired or invalid - clear it
+        try {
+          const { invalidateAuth } = await import("@/contexts/AuthContext");
+          await invalidateAuth();
+        } catch (e) {
+          // Fallback: clear token directly
+          try {
+            await AsyncStorage.removeItem("token");
+            setAuthToken(null);
+          } catch (err) {
+            console.error("Error clearing token:", err);
+          }
+        }
+        // Return a more user-friendly error
+        return Promise.reject(new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
+      }
+      
+      return Promise.reject(error);
     }
-    
-    return Promise.reject(error);
-  }
-);
+  );
+};
+
+setupResponseInterceptor(axiosInstance);
+setupResponseInterceptor(uploadAxiosInstance);

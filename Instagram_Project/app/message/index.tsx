@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -7,35 +7,47 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { ThemedView } from '@/components/themed-view';
-import { Avatar } from '@/components/common/Avatar';
-import { Colors } from '@/constants/colors';
-import { Spacing, FontSizes } from '@/constants/styles';
-import { useConversations } from '@/hooks/useMessage';
-import { Conversation } from '@/types/message';
-import { router } from 'expo-router';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { ThemedView } from "@/components/themed-view";
+import { Avatar } from "@/components/common/Avatar";
+import { Colors } from "@/constants/colors";
+import { Spacing, FontSizes } from "@/constants/styles";
+import { useConversations } from "@/hooks/useMessage";
+import { Conversation } from "@/types/message";
+import { router } from "expo-router";
+import { SwipeBackView } from "@/components/common";
+import { useMe } from "@/hooks/useAuth";
 
 interface ConversationItemProps {
   conversation: Conversation;
   onPress: () => void;
 }
 
-const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onPress }) => {
+const ConversationItem: React.FC<ConversationItemProps> = ({
+  conversation,
+  onPress,
+}) => {
   const profile = conversation.user.profile;
-  const displayName = profile?.fullName || conversation.user.email || conversation.user.phone || 'Người dùng';
+  const displayName =
+    profile?.fullName ||
+    conversation.user.email ||
+    conversation.user.phone ||
+    "Người dùng";
   const avatarUrl = profile?.avatarUrl || null;
-  
+
   const lastMessage = conversation.lastMessage;
-  const lastMessageText = lastMessage?.content || 
-    (lastMessage?.media && lastMessage.media.length > 0 
-      ? (lastMessage.media[0].mediaType === 'video' ? '📹 Video' : '📷 Hình ảnh')
-      : '');
-  
+  const lastMessageText =
+    lastMessage?.content ||
+    (lastMessage?.media && lastMessage.media.length > 0
+      ? lastMessage.media[0].mediaType === "video"
+        ? "📹 Video"
+        : "📷 Hình ảnh"
+      : "");
+
   const formatTime = (dateString: string | null) => {
-    if (!dateString) return '';
+    if (!dateString) return "";
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -43,21 +55,25 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onPre
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 1) return "Vừa xong";
     if (diffMins < 60) return `${diffMins} phút`;
     if (diffHours < 24) return `${diffHours} giờ`;
     if (diffDays < 7) return `${diffDays} ngày`;
-    return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'short' });
+    return date.toLocaleDateString("vi-VN", { day: "numeric", month: "short" });
   };
 
   return (
-    <TouchableOpacity style={styles.conversationItem} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.conversationItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.avatarContainer}>
         <Avatar source={avatarUrl} size={56} showBorder={false} />
         {conversation.unreadCount > 0 && (
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadBadgeText}>
-              {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+              {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
             </Text>
           </View>
         )}
@@ -74,18 +90,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onPre
           )}
         </View>
         <View style={styles.conversationFooter}>
-          <Text 
+          <Text
             style={[
               styles.lastMessage,
-              conversation.unreadCount > 0 && styles.lastMessageUnread
-            ]} 
+              conversation.unreadCount > 0 && styles.lastMessageUnread,
+            ]}
             numberOfLines={1}
           >
-            {lastMessageText || 'Chưa có tin nhắn'}
+            {lastMessageText || "Chưa có tin nhắn"}
           </Text>
-          {conversation.unreadCount > 0 && (
-            <View style={styles.unreadDot} />
-          )}
+          {conversation.unreadCount > 0 && <View style={styles.unreadDot} />}
         </View>
       </View>
     </TouchableOpacity>
@@ -94,9 +108,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onPre
 
 export default function ConversationListScreen() {
   const { data: conversations, isLoading, error, refetch } = useConversations();
+  const { data: currentUser } = useMe();
 
   const handleConversationPress = (userId: string) => {
     router.push(`/message/chat/${userId}`);
+  };
+
+  const handleSelfMessage = () => {
+    if (currentUser?.id) {
+      router.push(`/message/chat/${currentUser.id}`);
+    }
   };
 
   const renderConversation = ({ item }: { item: Conversation }) => (
@@ -108,66 +129,82 @@ export default function ConversationListScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.container}>
-        <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Tin nhắn</Text>
-          </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <SwipeBackView enabled={true} style={styles.container}>
+        <ThemedView style={styles.container}>
+          <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Tin nhắn</Text>
+            </View>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          </SafeAreaView>
+        </ThemedView>
+      </SwipeBackView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tin nhắn</Text>
-          <TouchableOpacity
-            style={styles.newMessageButton}
-            onPress={() => router.push('/(tabs)/search')}
-          >
-            <Ionicons name="create-outline" size={24} color={Colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Conversations List */}
-        {conversations && conversations.length > 0 ? (
-          <FlatList
-            data={conversations}
-            renderItem={renderConversation}
-            keyExtractor={(item) => item.userId}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            refreshControl={
-              <RefreshControl
-                refreshing={isLoading}
-                onRefresh={refetch}
-                tintColor={Colors.primary}
-              />
-            }
-          />
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={64} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>Chưa có tin nhắn</Text>
-            <Text style={styles.emptySubtext}>
-              Bắt đầu trò chuyện với bạn bè của bạn
-            </Text>
-            <TouchableOpacity
-              style={styles.searchButton}
-              onPress={() => router.push('/(tabs)/search')}
-            >
-              <Text style={styles.searchButtonText}>Tìm kiếm bạn bè</Text>
-            </TouchableOpacity>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
+        <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Tin nhắn</Text>
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.newMessageButton}
+                onPress={() => router.push("/(tabs)/search")}
+              >
+                <Ionicons name="create-outline" size={24} color={Colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.newMessageButton}
+                onPress={handleSelfMessage}
+              >
+                <Ionicons name="person-outline" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-      </SafeAreaView>
-    </ThemedView>
+
+          {/* Conversations List */}
+          {conversations && conversations.length > 0 ? (
+            <FlatList
+              data={conversations}
+              renderItem={renderConversation}
+              keyExtractor={(item) => item.userId}
+              contentContainerStyle={styles.listContent}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isLoading}
+                  onRefresh={refetch}
+                  tintColor={Colors.primary}
+                />
+              }
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="chatbubbles-outline"
+                size={64}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.emptyText}>Chưa có tin nhắn</Text>
+              <Text style={styles.emptySubtext}>
+                Bắt đầu trò chuyện với bạn bè của bạn
+              </Text>
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={() => router.push("/(tabs)/search")}
+              >
+                <Text style={styles.searchButtonText}>Tìm kiếm bạn bè</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </SafeAreaView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 
@@ -180,9 +217,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
@@ -191,33 +228,38 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: FontSizes.xl,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   newMessageButton: {
     padding: Spacing.xs,
+    marginLeft: Spacing.sm,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContent: {
     paddingVertical: Spacing.sm,
   },
   conversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.background,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginRight: Spacing.md,
   },
   unreadBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: -4,
     backgroundColor: Colors.error,
@@ -225,28 +267,28 @@ const styles = StyleSheet.create({
     minWidth: 20,
     height: 18,
     paddingHorizontal: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
     borderColor: Colors.background,
   },
   unreadBadgeText: {
     color: Colors.textLight,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   conversationContent: {
     flex: 1,
   },
   conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.xs,
   },
   conversationName: {
     fontSize: FontSizes.md,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
     flex: 1,
   },
@@ -256,9 +298,9 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   conversationFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   lastMessage: {
     fontSize: FontSizes.sm,
@@ -266,7 +308,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   lastMessageUnread: {
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
   },
   unreadDot: {
@@ -283,14 +325,14 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.xxl,
   },
   emptyText: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
@@ -298,7 +340,7 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.lg,
   },
   searchButton: {
@@ -311,6 +353,6 @@ const styles = StyleSheet.create({
   searchButtonText: {
     color: Colors.textLight,
     fontSize: FontSizes.md,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

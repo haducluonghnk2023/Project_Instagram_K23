@@ -15,12 +15,38 @@ export const useCreatePost = () => {
   return useMutation({
     mutationFn: (data: CreatePostRequest) => createPostApi(data),
     onSuccess: (newPost) => {
-      // Invalidate tất cả feed queries (với pattern matching)
+      // Update cache với exact query key để đảm bảo match
+      // Update tất cả feed queries (với các page khác nhau)
+      queryClient.setQueriesData<Post[]>(
+        { 
+          predicate: (query: any) => {
+            return query.queryKey[0] === "posts" && query.queryKey[1] === "feed";
+          }
+        },
+        (old: Post[] | undefined) => {
+          if (old && Array.isArray(old)) {
+            // Kiểm tra xem post đã có chưa để tránh duplicate
+            const exists = old.some(p => p.id === newPost.id);
+            if (!exists) {
+              // Thêm post mới vào đầu array
+              return [newPost, ...old];
+            }
+            return old;
+          }
+          // Nếu chưa có cache, tạo mới với post mới (đặc biệt cho page 0)
+          return [newPost];
+        }
+      );
+
+      // Invalidate và refetch tất cả feed queries để đảm bảo sync với server
+      // Đặc biệt là page 0 (home feed)
       queryClient.invalidateQueries({ 
         predicate: (query: any) => {
-          return query.queryKey[0] === "posts" && 
-                 (query.queryKey[1] === "feed" || query.queryKey.length === 1);
-        }
+          const key = query.queryKey;
+          return key[0] === "posts" && 
+                 (key[1] === "feed" || key.length === 1);
+        },
+        refetchType: 'active', // Chỉ refetch các query đang active (đang được sử dụng)
       });
       
       // Invalidate user posts để cập nhật profile
@@ -29,27 +55,6 @@ export const useCreatePost = () => {
           return query.queryKey[0] === "posts" && query.queryKey[1] === "user";
         }
       });
-      
-      // Thêm post mới vào đầu feed cache (optimistic update)
-      queryClient.setQueriesData<Post[]>(
-        { 
-          predicate: (query: any) => {
-            return query.queryKey[0] === "posts" && query.queryKey[1] === "feed";
-          }
-        },
-        (old: Post[] | undefined) => {
-          if (old) {
-            // Kiểm tra xem post đã có chưa để tránh duplicate
-            const exists = old.some(p => p.id === newPost.id);
-            if (!exists) {
-              return [newPost, ...old];
-            }
-            return old;
-          }
-          // Nếu chưa có cache, tạo mới với post mới
-          return [newPost];
-        }
-      );
     },
   });
 };
@@ -71,11 +76,28 @@ export const useDeletePost = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (postId: string) => deletePostApi(postId),
-    onSuccess: () => {
+    onSuccess: (_, postId) => {
+      // Optimistic update: remove bài viết khỏi tất cả cache queries
+      queryClient.setQueriesData<Post[]>(
+        { 
+          predicate: (query: any) => {
+            return query.queryKey[0] === "posts";
+          }
+        },
+        (old: Post[] | undefined) => {
+          if (old) {
+            return old.filter(p => p.id !== postId);
+          }
+          return old;
+        }
+      );
+      
+      // Invalidate queries để đảm bảo sync với server
       queryClient.invalidateQueries({ queryKey: ["posts", "feed"] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["posts", "user"] });
       queryClient.invalidateQueries({ queryKey: ["posts", "reels"] });
+      queryClient.invalidateQueries({ queryKey: ["posts", postId] });
     },
   });
 };
@@ -92,8 +114,8 @@ export const useFeed = (page: number = 0, size: number = 10) => {
   return useQuery<Post[]>({
     queryKey: ["posts", "feed", page, size],
     queryFn: () => getFeedApi(page, size),
-    staleTime: 30 * 1000, // 30 seconds
-    keepPreviousData: true, // Keep previous data while loading new page
+    staleTime: 0, // Luôn coi là stale để đảm bảo refetch khi cần
+    keepPreviousData: page > 0, // Chỉ keep previous data khi load more (page > 0)
   });
 };
 

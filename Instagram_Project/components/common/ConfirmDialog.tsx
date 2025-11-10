@@ -65,7 +65,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         activeOpacity={1}
         onPress={onCancel}
       >
-        <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.container}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.content}>
             <View style={styles.iconContainer}>
               <Ionicons name={getIcon() as any} size={48} color={getIconColor()} />
@@ -98,7 +102,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
   );

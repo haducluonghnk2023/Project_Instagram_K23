@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { Input } from '@/components/common/Input';
-import { Avatar } from '@/components/common/Avatar';
-import { Button } from '@/components/common/Button';
-import { Colors } from '@/constants/colors';
-import { Spacing, BorderRadius, FontSizes } from '@/constants/styles';
-import { searchUsersApi, sendFriendRequestApi } from '@/services/friend.api';
-import { UserInfo } from '@/types/auth';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { ThemedView } from "@/components/themed-view";
+import { Input } from "@/components/common/Input";
+import { Avatar } from "@/components/common/Avatar";
+import { Button } from "@/components/common/Button";
+import { Colors } from "@/constants/colors";
+import { Spacing, FontSizes } from "@/constants/styles";
+import { searchUsersApi, sendFriendRequestApi } from "@/services/friend.api";
+import { UserInfo } from "@/types/auth";
+import { SwipeBackView } from "@/components/common";
 
 interface SearchResultItemProps {
   user: UserInfo;
@@ -32,7 +32,8 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
   isLoading = false,
 }) => {
   const profile = user.profile;
-  const displayName = profile?.fullName || user.email || user.phone || 'Người dùng';
+  const displayName =
+    profile?.fullName || user.email || user.phone || "Người dùng";
 
   return (
     <View style={styles.searchItem}>
@@ -65,7 +66,7 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
 };
 
 export default function SearchScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [loadingUserIds, setLoadingUserIds] = useState<Set<string>>(new Set());
@@ -82,8 +83,10 @@ export default function SearchScreen() {
       setSearchResults(response.users || []);
     } catch (error: any) {
       Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể tìm kiếm. Vui lòng thử lại.'
+        "Lỗi",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể tìm kiếm. Vui lòng thử lại."
       );
       setSearchResults([]);
     } finally {
@@ -93,20 +96,25 @@ export default function SearchScreen() {
 
   const handleSendRequest = async (user: UserInfo) => {
     if (!user.phone) {
-      Alert.alert('Lỗi', 'Không thể gửi lời mời: Người dùng không có số điện thoại');
+      Alert.alert(
+        "Lỗi",
+        "Không thể gửi lời mời: Người dùng không có số điện thoại"
+      );
       return;
     }
 
     setLoadingUserIds((prev) => new Set(prev).add(user.id));
     try {
       await sendFriendRequestApi({ phone: user.phone });
-      Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
+      Alert.alert("Thành công", "Đã gửi lời mời kết bạn");
       // Remove from search results after sending request
       setSearchResults((prev) => prev.filter((u) => u.id !== user.id));
     } catch (error: any) {
       Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể gửi lời mời. Vui lòng thử lại.'
+        "Lỗi",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể gửi lời mời. Vui lòng thử lại."
       );
     } finally {
       setLoadingUserIds((prev) => {
@@ -126,70 +134,84 @@ export default function SearchScreen() {
   );
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tìm kiếm</Text>
-        </View>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
+        <SafeAreaView edges={["top"]} style={styles.safeArea}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Tìm kiếm</Text>
+          </View>
 
-        {/* Search Input */}
-        <View style={styles.searchContainer}>
-          <Input
-            placeholder="Tìm kiếm theo email hoặc số điện thoại..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-            leftIcon="search-outline"
-            containerStyle={styles.searchInput}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                setSearchQuery('');
-                setSearchResults([]);
-              }}
-            >
-              <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
+          {/* Search Input */}
+          <View style={styles.searchContainer}>
+            <Input
+              placeholder="Tìm kiếm theo email hoặc số điện thoại..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              leftIcon="search-outline"
+              containerStyle={styles.searchInput}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => {
+                  setSearchQuery("");
+                  setSearchResults([]);
+                }}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={Colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Search Results */}
+          {isSearching ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.loadingText}>Đang tìm kiếm...</Text>
+            </View>
+          ) : searchResults.length > 0 ? (
+            <FlatList
+              data={searchResults}
+              renderItem={renderSearchResult}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+          ) : searchQuery.length > 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="search-outline"
+                size={64}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.emptyText}>Không tìm thấy kết quả</Text>
+              <Text style={styles.emptySubtext}>
+                Thử tìm kiếm với email hoặc số điện thoại khác
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="people-outline"
+                size={64}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.emptyText}>Tìm kiếm bạn bè</Text>
+              <Text style={styles.emptySubtext}>
+                Nhập email hoặc số điện thoại để tìm bạn bè
+              </Text>
+            </View>
           )}
-        </View>
-
-        {/* Search Results */}
-        {isSearching ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Đang tìm kiếm...</Text>
-          </View>
-        ) : searchResults.length > 0 ? (
-          <FlatList
-            data={searchResults}
-            renderItem={renderSearchResult}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-        ) : searchQuery.length > 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={64} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>Không tìm thấy kết quả</Text>
-            <Text style={styles.emptySubtext}>
-              Thử tìm kiếm với email hoặc số điện thoại khác
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>Tìm kiếm bạn bè</Text>
-            <Text style={styles.emptySubtext}>
-              Nhập email hoặc số điện thoại để tìm bạn bè
-            </Text>
-          </View>
-        )}
-      </SafeAreaView>
-    </ThemedView>
+        </SafeAreaView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 
@@ -203,15 +225,15 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     backgroundColor: Colors.background,
   },
   headerTitle: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
   },
   searchContainer: {
@@ -220,21 +242,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    position: 'relative',
+    position: "relative",
   },
   searchInput: {
     marginBottom: 0,
   },
   clearButton: {
-    position: 'absolute',
+    position: "absolute",
     right: Spacing.md + 8,
     top: Spacing.sm + 12,
     zIndex: 2,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: Spacing.xl,
   },
   loadingText: {
@@ -246,8 +268,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   searchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.background,
@@ -261,7 +283,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: FontSizes.md,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
     marginBottom: 2,
   },
@@ -284,14 +306,14 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.xxl,
   },
   emptyText: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text,
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
@@ -299,7 +321,7 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 20,
   },
 });

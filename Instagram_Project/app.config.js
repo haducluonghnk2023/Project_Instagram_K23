@@ -35,7 +35,7 @@ export default {
       typedRoutes: true,
     },
     extra: {
-      apiBaseUrl: process.env.API_BASE_URL || "http://192.168.2.174:8080",
+      apiBaseUrl: process.env.API_BASE_URL || "http://192.168.100.175:8080",
       apiPrefix: process.env.API_PREFIX || "/api/v1",
       env: process.env.NODE_ENV || "development",
     },

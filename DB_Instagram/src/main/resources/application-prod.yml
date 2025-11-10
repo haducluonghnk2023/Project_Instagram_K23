@@ -23,8 +23,14 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 50MB
+      max-file-size: 1GB
+      max-request-size: 1GB
+      file-size-threshold: 10MB
+      enabled: true
+      location: ${java.io.tmpdir}
+  mvc:
+    async:
+      request-timeout: 300000  # 5 minutes timeout for file uploads
 
 jwt:
   secret:

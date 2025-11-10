@@ -197,5 +197,20 @@ public class FriendController {
                         .data(blockedUsers)
                         .build());
     }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<?> getUserFriends(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable UUID userId) {
+        // Allow getting friends of any user (for viewing their profile)
+        List<FriendInfo> friends = friendService.getFriends(userId);
+        
+        return ResponseEntity.ok(
+                ResponseWrapper.builder()
+                        .status(HttpStatus.OK)
+                        .code(HttpStatus.OK.value())
+                        .data(friends)
+                        .build());
+    }
 }
 

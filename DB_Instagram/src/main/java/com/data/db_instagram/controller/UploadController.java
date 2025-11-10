@@ -72,34 +72,6 @@ public class UploadController {
                             .build());
         }
     }
-    
-    @PostMapping("/post")
-    public ResponseEntity<?> uploadPostImage(
-            @RequestParam("file") MultipartFile file
-    ) {
-        try {
-            String imageUrl = cloudinaryService.uploadImage(file, "instagram/posts");
-            
-            UploadResponse response = UploadResponse.builder()
-                    .url(imageUrl)
-                    .build();
-            
-            return ResponseEntity.ok(
-                    ResponseWrapper.builder()
-                            .status(HttpStatus.OK)
-                            .code(HttpStatus.OK.value())
-                            .data(response)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ResponseWrapper.builder()
-                            .status(HttpStatus.BAD_REQUEST)
-                            .code(HttpStatus.BAD_REQUEST.value())
-                            .data(e.getMessage())
-                            .build());
-        }
-    }
 
     @PostMapping("/video")
     public ResponseEntity<?> uploadVideo(

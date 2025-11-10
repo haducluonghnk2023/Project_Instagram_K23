@@ -22,8 +22,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar } from "@/components/common";
 import { Ionicons } from "@expo/vector-icons";
+import { SwipeBackView, useToast } from "@/components/common";
+import { getErrorMessage } from "@/utils/error";
 
 export default function EditProfileScreen() {
+  const { showToast } = useToast();
   const { data: userInfo, isLoading: isLoadingUser, refetch } = useMe();
   const { mutate: updateProfile, isPending } = useUpdateMe();
   
@@ -80,10 +83,11 @@ export default function EditProfileScreen() {
       setAvatarUrl(uploadedUrl);
       setLocalAvatarUri(null); // Xóa local URI vì đã có URL từ server
       
-      Alert.alert("Thành công", "Đã upload ảnh đại diện! Nhấn Lưu để cập nhật.");
-    } catch (error: any) {
+      showToast("Đã upload ảnh đại diện! Nhấn Lưu để cập nhật.", "success");
+    } catch (error: unknown) {
       setLocalAvatarUri(null); // Xóa local URI nếu upload thất bại
-      Alert.alert("Lỗi", error.message || "Không thể upload ảnh");
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || "Không thể upload ảnh", "error");
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -110,12 +114,9 @@ export default function EditProfileScreen() {
           // Quay về trang profile thay vì back (có thể back về trang khác)
           router.replace("/(tabs)/profile");
         },
-        onError: (error: any) => {
-          const errorMessage =
-            error?.response?.data?.message ||
-            error?.message ||
-            "Có lỗi xảy ra khi cập nhật";
-          Alert.alert("Lỗi", errorMessage);
+        onError: (error: unknown) => {
+          const errorMessage = getErrorMessage(error);
+          showToast(errorMessage || "Có lỗi xảy ra khi cập nhật", "error");
         },
       }
     );
@@ -130,11 +131,21 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <ThemedView style={CommonStyles.container}>
+    <SwipeBackView enabled={true} style={CommonStyles.container}>
+      <ThemedView style={CommonStyles.container}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/profile');
+              }
+            }} 
+            style={styles.backButton}
+          >
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <ThemedText type="title" style={styles.headerTitle}>
@@ -278,7 +289,8 @@ export default function EditProfileScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

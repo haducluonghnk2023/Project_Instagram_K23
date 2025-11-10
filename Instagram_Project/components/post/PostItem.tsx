@@ -29,9 +29,10 @@ const { width, height } = Dimensions.get("window");
 interface PostItemProps {
   post: Post;
   onCommentPress?: () => void;
+  onPostDeleted?: (postId: string) => void;
 }
 
-export const PostItem = React.memo(({ post, onCommentPress }: PostItemProps) => {
+export const PostItem = React.memo(({ post, onCommentPress, onPostDeleted }: PostItemProps) => {
   const { mutate: toggleReaction, isPending } = useToggleReaction();
   const { mutate: savePost } = useSavePost();
   const { mutate: unsavePost } = useUnsavePost();
@@ -182,6 +183,7 @@ export const PostItem = React.memo(({ post, onCommentPress }: PostItemProps) => 
           currentUserId={currentUser.id}
           visible={showPostMenu}
           onClose={() => setShowPostMenu(false)}
+          onPostDeleted={onPostDeleted}
         />
       )}
 

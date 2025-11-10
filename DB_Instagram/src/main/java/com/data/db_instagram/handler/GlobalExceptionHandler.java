@@ -12,6 +12,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.apache.catalina.connector.ClientAbortException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
@@ -38,9 +40,38 @@ public class GlobalExceptionHandler
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<?> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex)
     {
+        log.warn("Max upload size exceeded", ex);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 ResponseWrapper.builder()
-                        .data(ex.getMessage())
+                        .data("Kích thước file quá lớn. Vui lòng thử lại với file nhỏ hơn.")
+                        .code(HttpStatus.BAD_REQUEST.value())
+                        .status(HttpStatus.BAD_REQUEST)
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<?> handleMultipartException(MultipartException ex)
+    {
+        log.warn("Multipart upload error", ex);
+        
+        // Check if it's a client abort (connection closed)
+        Throwable cause = ex.getCause();
+        if (cause instanceof ClientAbortException || 
+            (cause != null && cause.getCause() instanceof ClientAbortException) ||
+            ex.getMessage() != null && ex.getMessage().contains("EOFException")) {
+            return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).body(
+                    ResponseWrapper.builder()
+                            .data("Kết nối bị ngắt trong khi upload. Vui lòng kiểm tra kết nối mạng và thử lại.")
+                            .code(HttpStatus.REQUEST_TIMEOUT.value())
+                            .status(HttpStatus.REQUEST_TIMEOUT)
+                            .build()
+            );
+        }
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ResponseWrapper.builder()
+                        .data("Lỗi khi upload file. Vui lòng thử lại.")
                         .code(HttpStatus.BAD_REQUEST.value())
                         .status(HttpStatus.BAD_REQUEST)
                         .build()

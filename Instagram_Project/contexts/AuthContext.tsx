@@ -98,7 +98,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(null);
       setAuthToken(null);
       setIsAuthenticated(false);
-    } catch (error) {}
+    } catch (error) {
+      // Log error but don't throw - auth invalidation should always succeed
+      console.error("Error invalidating auth:", error);
+    }
   };
 
   useEffect(() => {

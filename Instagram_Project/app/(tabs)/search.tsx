@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,9 @@ import { Spacing, BorderRadius, FontSizes } from '@/constants/styles';
 import { searchUsersApi, sendFriendRequestApi, cancelFriendRequestApi, getFriendRequestsApi } from '@/services/friend.api';
 import { UserInfo } from '@/types/auth';
 import { router } from 'expo-router';
+import { SwipeBackView, useToast } from '@/components/common';
+import { useFriends } from '@/hooks/useFriend';
+import { getErrorMessage } from '@/utils/error';
 
 interface SearchResultItemProps {
   user: UserInfo;
@@ -26,6 +29,7 @@ interface SearchResultItemProps {
   onCancelRequest: (user: UserInfo) => void;
   isLoading?: boolean;
   hasSentRequest?: boolean;
+  isFriend?: boolean;
 }
 
 const SearchResultItem: React.FC<SearchResultItemProps> = ({
@@ -34,6 +38,7 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
   onCancelRequest,
   isLoading = false,
   hasSentRequest = false,
+  isFriend = false,
 }) => {
   const profile = user.profile;
   const displayName = profile?.fullName || user.email || user.phone || 'Người dùng';
@@ -61,7 +66,11 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
           )}
         </View>
       </TouchableOpacity>
-      {hasSentRequest ? (
+      {isFriend ? (
+        <View style={styles.friendBadge}>
+          <Text style={styles.friendBadgeText}>Đã là bạn bè</Text>
+        </View>
+      ) : hasSentRequest ? (
         <Button
           title="Hủy"
           onPress={() => onCancelRequest(user)}
@@ -87,12 +96,20 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
 };
 
 export default function SearchScreen() {
+  const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserInfo[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [loadingUserIds, setLoadingUserIds] = useState<Set<string>>(new Set());
   const [sentRequestUserIds, setSentRequestUserIds] = useState<Set<string>>(new Set());
   const [requestIds, setRequestIds] = useState<Map<string, string>>(new Map()); // userId -> requestId
+  const { data: friends } = useFriends();
+  
+  // Tạo Set chứa các userId đã là bạn bè
+  const friendUserIds = useMemo(() => {
+    if (!friends) return new Set<string>();
+    return new Set(friends.map(friend => friend.userId));
+  }, [friends]);
 
   const loadSentRequests = async () => {
     try {
@@ -125,11 +142,9 @@ export default function SearchScreen() {
       setSearchResults(response.users || []);
       // Load sent requests để biết user nào đã gửi request
       await loadSentRequests();
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể tìm kiếm. Vui lòng thử lại.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể tìm kiếm. Vui lòng thử lại.', 'error');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -138,7 +153,7 @@ export default function SearchScreen() {
 
   const handleSendRequest = async (user: UserInfo) => {
     if (!user.phone) {
-      Alert.alert('Lỗi', 'Không thể gửi lời mời: Người dùng không có số điện thoại');
+      showToast('Không thể gửi lời mời: Người dùng không có số điện thoại', 'error');
       return;
     }
 
@@ -153,11 +168,9 @@ export default function SearchScreen() {
         return newMap;
       });
       // Không hiển thị thông báo thành công và không xóa user khỏi danh sách
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể gửi lời mời. Vui lòng thử lại.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể gửi lời mời. Vui lòng thử lại.', 'error');
     } finally {
       setLoadingUserIds((prev) => {
         const newSet = new Set(prev);
@@ -188,11 +201,9 @@ export default function SearchScreen() {
         return newMap;
       });
       // Không hiển thị thông báo
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể hủy lời mời. Vui lòng thử lại.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể hủy lời mời. Vui lòng thử lại.', 'error');
     } finally {
       setLoadingUserIds((prev) => {
         const newSet = new Set(prev);
@@ -209,11 +220,13 @@ export default function SearchScreen() {
       onCancelRequest={handleCancelRequest}
       isLoading={loadingUserIds.has(item.id)}
       hasSentRequest={sentRequestUserIds.has(item.id)}
+      isFriend={friendUserIds.has(item.id)}
     />
   );
 
   return (
-    <ThemedView style={styles.container}>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -276,7 +289,8 @@ export default function SearchScreen() {
           </View>
         )}
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 
@@ -377,6 +391,20 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: FontSizes.sm,
+  },
+  friendBadge: {
+    minWidth: 100,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.borderLight,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendBadgeText: {
+    fontSize: FontSizes.sm,
+    color: Colors.textSecondary,
+    fontWeight: '500',
   },
   separator: {
     height: 1,

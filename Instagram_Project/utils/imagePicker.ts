@@ -127,16 +127,8 @@ export const pickVideoFromLibrary = async (maxDuration?: number): Promise<ImageP
   const duration = asset.duration ? asset.duration * 1000 : undefined; // Convert seconds to milliseconds
   const fileSize = asset.fileSize || undefined;
 
-  // Validate file size
-  if (fileSize && fileSize > LIMITS.MAX_VIDEO_SIZE) {
-    const maxSizeMB = LIMITS.MAX_VIDEO_SIZE / (1024 * 1024);
-    const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
-    Alert.alert(
-      "Lỗi",
-      `Kích thước video quá lớn (${fileSizeMB}MB). Kích thước tối đa cho phép là ${maxSizeMB}MB.`
-    );
-    return { uri: "", cancelled: true };
-  }
+  // Bỏ qua kiểm tra kích thước - cho phép upload video bất kỳ
+  // Nếu upload thất bại, server sẽ báo lỗi
 
   // Validate duration if provided
   if (maxDuration && duration && duration > maxDuration) {
@@ -182,16 +174,8 @@ export const takeVideoFromCamera = async (maxDuration?: number): Promise<ImagePi
   const duration = asset.duration ? asset.duration * 1000 : undefined; // Convert seconds to milliseconds
   const fileSize = asset.fileSize || undefined;
 
-  // Validate file size
-  if (fileSize && fileSize > LIMITS.MAX_VIDEO_SIZE) {
-    const maxSizeMB = LIMITS.MAX_VIDEO_SIZE / (1024 * 1024);
-    const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
-    Alert.alert(
-      "Lỗi",
-      `Kích thước video quá lớn (${fileSizeMB}MB). Kích thước tối đa cho phép là ${maxSizeMB}MB.`
-    );
-    return { uri: "", cancelled: true };
-  }
+  // Bỏ qua kiểm tra kích thước - cho phép upload video bất kỳ
+  // Nếu upload thất bại, server sẽ báo lỗi
 
   // Validate duration if provided
   if (maxDuration && duration && duration > maxDuration) {

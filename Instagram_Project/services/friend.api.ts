@@ -105,3 +105,9 @@ export const getBlockedUsersApi = async (): Promise<FriendInfo[]> => {
   return res.data;
 };
 
+// Get friends of a specific user
+export const getUserFriendsApi = async (userId: string): Promise<FriendInfo[]> => {
+  const res = await api.get<FriendInfo[]>(`/friends/${userId}`);
+  return res.data;
+};
+

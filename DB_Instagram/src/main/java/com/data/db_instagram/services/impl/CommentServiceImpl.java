@@ -47,6 +47,17 @@ public class CommentServiceImpl implements CommentService {
             throw new HttpBadRequest("Comment must have either content or image");
         }
         
+        // Validate comment depth: only allow 2 levels (parent comment and one level of replies)
+        if (request.getParentCommentId() != null) {
+            Comments parentComment = commentsRepository.findById(request.getParentCommentId())
+                    .orElseThrow(() -> new HttpNotFound("Parent comment not found"));
+            
+            // If parent comment itself has a parent, reject (max depth is 2)
+            if (parentComment.getParentComment() != null) {
+                throw new HttpBadRequest("Cannot reply to a reply. Maximum comment depth is 2 levels.");
+            }
+        }
+        
         Comments comment = new Comments();
         comment.setPostId(postId);
         comment.setUserId(userId);

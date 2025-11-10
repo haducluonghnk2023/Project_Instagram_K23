@@ -18,6 +18,7 @@ import { Colors } from "@/constants/colors";
 import { Spacing, FontSizes } from "@/constants/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useFeed } from "@/hooks/usePost";
 import { useQueryClient } from "@tanstack/react-query";
 import { PostItem } from "@/components/post";
@@ -29,6 +30,7 @@ import { isStory, filterRegularPosts } from "@/utils/post";
 import { getUserDisplayName, formatUsername, getAvatarUrl } from "@/utils/user";
 import { LIMITS } from "@/constants/limits";
 import { Post } from "@/types/post";
+import { useSwipeBack } from "@/hooks/useSwipeBack";
 
 const { width } = Dimensions.get("window");
 
@@ -41,16 +43,16 @@ export default function HomeTab() {
   const { data: unreadCount } = useUnreadNotificationCount();
   const { data: friends } = useFriends();
   const { data: currentUser } = useMe();
+  const swipeBackHandlers = useSwipeBack(false); // Disable for home tab (root screen)
 
   // Accumulate posts for infinite scroll
   React.useEffect(() => {
     if (posts && Array.isArray(posts)) {
       if (page === 0) {
-        // Chỉ update khi có data mới và không phải empty array
-        // Nếu posts là empty array, giữ nguyên allPosts cũ (có thể do lỗi tạm thời)
-        if (posts.length > 0) {
-          setAllPosts(posts);
-        }
+        // Luôn update allPosts khi page === 0, kể cả khi empty array
+        // Điều này đảm bảo khi xóa bài viết cuối cùng, UI sẽ hiển thị empty state
+        // Và khi có post mới từ cache, nó sẽ được hiển thị ngay
+        setAllPosts(posts);
       } else {
         // Load more: chỉ thêm posts mới, không reset
         setAllPosts((prev) => {
@@ -64,9 +66,30 @@ export default function HomeTab() {
         });
       }
     }
-    // Không reset allPosts khi posts là undefined hoặc empty array
-    // Chỉ update khi thực sự có data mới
   }, [posts, page]);
+
+  // Refetch feed when screen is focused (when returning from other screens)
+  // This ensures we have the latest posts, especially after creating a new post
+  // Only refetch if we're on page 0 to avoid unnecessary requests
+  const isFirstFocus = React.useRef(true);
+  useFocusEffect(
+    React.useCallback(() => {
+      // Skip refetch on initial mount (React Query will fetch automatically)
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      
+      // Only refetch page 0 when returning to screen
+      if (page === 0) {
+        // Đợi một chút để đảm bảo navigation đã hoàn tất
+        const timer = setTimeout(() => {
+          refetch();
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }, [page, refetch])
+  );
 
   // Check if user has story (posts with video in last 24 hours, NOT reels)
   const checkHasStory = (userId: string): boolean => {
@@ -121,18 +144,18 @@ export default function HomeTab() {
   // Note: regularPosts is now computed from allPosts in render
 
   const handleRefresh = async () => {
+    // Set page về 0 trước
+    setPage(0);
+    
     // Invalidate và refetch query với page = 0
     // Điều này đảm bảo fetch lại từ đầu
-    queryClient.invalidateQueries({ 
+    await queryClient.invalidateQueries({ 
       queryKey: ["posts", "feed", 0, 10],
       refetchType: "active" // Chỉ refetch nếu query đang active
     });
     
-    // Set page về 0 để đảm bảo UI hiển thị đúng
-    setPage(0);
-    
-    // React Query sẽ tự động refetch khi query bị invalidate
-    // useEffect sẽ tự động update allPosts khi posts thay đổi
+    // Refetch để đảm bảo có data mới
+    await refetch();
   };
 
   const handleLoadMore = () => {
@@ -293,6 +316,10 @@ export default function HomeTab() {
                   key={post.id}
                   post={post}
                   onCommentPress={() => router.push(`/post/detail/${post.id}`)}
+                  onPostDeleted={(deletedPostId) => {
+                    // Optimistic update: remove bài viết đã xóa khỏi local state ngay lập tức
+                    setAllPosts((prev) => prev.filter((p) => p.id !== deletedPostId));
+                  }}
                 />
               ))}
               {isFetching && page > 0 && (

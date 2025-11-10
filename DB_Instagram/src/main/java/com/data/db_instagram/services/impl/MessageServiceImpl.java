@@ -43,16 +43,17 @@ public class MessageServiceImpl implements MessageService {
         Users toUser = userRepository.findById(request.getToUserId())
                 .orElseThrow(() -> new HttpNotFound("User not found"));
 
-        if (fromUserId.equals(request.getToUserId())) {
-            throw new HttpForbidden("Cannot send message to yourself");
-        }
+        // Cho phép tự nhắn tin (self-messaging) - giống Instagram/Facebook
+        // Khi tự nhắn tin, tự động đánh dấu là đã đọc
+        boolean isSelfMessage = fromUserId.equals(request.getToUserId());
 
         Messages message = new Messages();
         message.setFrom_user(fromUserId);
         message.setTo_user(request.getToUserId());
         message.setContent(request.getContent() != null && !request.getContent().trim().isEmpty() 
             ? request.getContent().trim() : null);
-        message.setIs_read(false);
+        // Nếu tự nhắn tin, tự động đánh dấu là đã đọc
+        message.setIs_read(isSelfMessage);
         message.setCreated_at(new Date());
         message = messagesRepository.save(message);
 

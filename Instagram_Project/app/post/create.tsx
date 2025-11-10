@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Video, ResizeMode } from "expo-av";
 import { useToast } from "@/components/common/ToastProvider";
 import { showErrorFromException } from "@/utils/toast";
+import { SwipeBackView } from "@/components/common";
 
 export default function CreatePostScreen() {
   const { mutate: createPost, isPending } = useCreatePost();
@@ -132,10 +133,17 @@ export default function CreatePostScreen() {
             const uploadedUrl = item.type === 'image' 
               ? await uploadImageApi(item.uri, "instagram/posts")
               : await uploadVideoApi(item.uri, "instagram/posts");
+            
+            if (!uploadedUrl) {
+              throw new Error(`Không nhận được URL sau khi upload ${item.type === 'image' ? 'ảnh' : 'video'}`);
+            }
+            
             return { url: uploadedUrl, type: item.type };
-          } catch (error: any) {
-            const { message } = showErrorFromException(error, `Không thể upload ${item.type === 'image' ? 'ảnh' : 'video'}`);
-            throw new Error(message);
+          } catch (error: unknown) {
+            console.error(`Upload ${item.type} error:`, error);
+            const { getErrorMessage } = require('@/utils/error');
+            const errorMessage = getErrorMessage(error);
+            throw new Error(errorMessage || `Không thể upload ${item.type === 'image' ? 'ảnh' : 'video'}`);
           }
         });
 
@@ -153,12 +161,13 @@ export default function CreatePostScreen() {
           mediaTypes,
         },
         {
-          onSuccess: () => {
+          onSuccess: async () => {
             showToast("Đã đăng bài viết!", "success");
-            // Navigate về home sau 500ms để user thấy toast
-            setTimeout(() => {
-              router.replace("/(tabs)/home");
-            }, 500);
+            // Đợi một chút để cache được update
+            await new Promise(resolve => setTimeout(resolve, 100));
+            // Navigate về home
+            // Cache đã được update, query sẽ tự động hiển thị post mới
+            router.replace("/(tabs)/home");
           },
           onError: (error: any) => {
             const { message } = showErrorFromException(error, "Không thể đăng bài viết");
@@ -175,7 +184,8 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <ThemedView style={CommonStyles.container}>
+    <SwipeBackView enabled={true} style={CommonStyles.container}>
+      <ThemedView style={CommonStyles.container}>
       <SafeAreaView edges={["top"]} style={CommonStyles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -342,7 +352,8 @@ export default function CreatePostScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

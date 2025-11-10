@@ -23,7 +23,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
     private static final List<String> ALLOWED_IMAGE_TYPES = Arrays.asList(
             "image/jpeg",
-            "image/jpg",
+            "image/jpg",  // Accept both jpg and jpeg for compatibility
             "image/png",
             "image/gif",
             "image/webp");
@@ -35,12 +35,6 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             "video/x-msvideo");
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
-    private static final long MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
-
-    @Override
-    public String uploadImage(MultipartFile file) throws Exception {
-        return uploadImage(file, "instagram");
-    }
 
     @Override
     public String uploadImage(MultipartFile file, String folder) throws Exception {
@@ -72,51 +66,23 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     }
 
     @Override
-    public void deleteImage(String publicId) throws Exception {
-        try {
-            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-            log.info("Image deleted successfully from Cloudinary: {}", publicId);
-        } catch (Exception e) {
-            log.error("Error deleting image from Cloudinary: {}", publicId, e);
-            throw new HttpBadRequest("Không thể xóa ảnh. Vui lòng thử lại.");
-        }
-    }
-
-    @Override
-    public String uploadVideo(MultipartFile file) throws Exception {
-        return uploadVideo(file, "instagram");
-    }
-
-    @Override
     public String uploadVideo(MultipartFile file, String folder) throws Exception {
         validateVideoFile(file);
 
         try {
-            // Cloudinary video compression parameters
-            // Tối ưu compression dựa trên folder (story vs post/reel)
-            boolean isStory = folder != null && folder.contains("stories");
-            
             Map<String, Object> uploadParams = ObjectUtils.asMap(
                     "folder", folder,
                     "resource_type", "video",
                     "overwrite", true,
-                    "invalidate", true,
-                    // Video compression settings - Cloudinary tự động tối ưu
-                    "quality", isStory ? "auto:low" : "auto:good", // Story: ưu tiên kích thước nhỏ hơn
-                    "format", "mp4" // Định dạng MP4 (hiệu quả về kích thước)
+                    "invalidate", true
             );
-            
-            // Thêm transformation cho story (video ngắn, cần compression mạnh hơn)
-            if (isStory) {
-                uploadParams.put("eager", "q_auto:low,vc_auto,ac_aac,fl_streaming_attachment"); // Streaming optimization
-            }
 
             Map<?, ?> uploadResult = cloudinary.uploader().upload(
                     file.getBytes(),
                     uploadParams);
 
             String videoUrl = (String) uploadResult.get("secure_url");
-            log.info("Video uploaded and compressed successfully to Cloudinary (folder: {}): {}", folder, videoUrl);
+            log.info("Video uploaded successfully to Cloudinary: {}", videoUrl);
 
             return videoUrl;
 
@@ -140,7 +106,14 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
-            throw new HttpBadRequest("Chỉ chấp nhận file ảnh (JPEG, PNG, GIF, WEBP)");
+            // Normalize jpg to jpeg for validation
+            String normalizedContentType = contentType != null && contentType.toLowerCase().equals("image/jpg")
+                    ? "image/jpeg"
+                    : contentType;
+            
+            if (normalizedContentType == null || !ALLOWED_IMAGE_TYPES.contains(normalizedContentType.toLowerCase())) {
+                throw new HttpBadRequest("Chỉ chấp nhận file ảnh (JPEG, PNG, GIF, WEBP). Nhận được: " + contentType);
+            }
         }
     }
 
@@ -149,9 +122,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             throw new HttpBadRequest("File không được để trống");
         }
 
-        if (file.getSize() > MAX_VIDEO_SIZE) {
-            throw new HttpBadRequest("Kích thước video không được vượt quá 50MB");
-        }
+        // Bỏ qua kiểm tra kích thước - cho phép upload video bất kỳ
+        // Nếu upload thất bại, Cloudinary sẽ báo lỗi
 
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_VIDEO_TYPES.contains(contentType.toLowerCase())) {

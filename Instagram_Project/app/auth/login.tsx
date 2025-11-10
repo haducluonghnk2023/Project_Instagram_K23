@@ -37,10 +37,19 @@ export default function LoginScreen() {
     email?: string;
     password?: string;
   }>();
+  const [isFillingFromParams, setIsFillingFromParams] = useState(false);
 
   useEffect(() => {
-    if (emailParam) setEmail(String(emailParam));
-    if (passwordParam) setPassword(String(passwordParam));
+    if (emailParam || passwordParam) {
+      setIsFillingFromParams(true);
+      // Fill data ngay lập tức
+      if (emailParam) setEmail(String(emailParam));
+      if (passwordParam) setPassword(String(passwordParam));
+      // Đợi một chút để đảm bảo state đã được update
+      setTimeout(() => {
+        setIsFillingFromParams(false);
+      }, 100);
+    }
   }, [emailParam, passwordParam]);
 
   // Không tự động redirect khi đã authenticated
@@ -62,6 +71,11 @@ export default function LoginScreen() {
   };
 
   const handleLogin = () => {
+    // Prevent login khi đang fill data từ params
+    if (isFillingFromParams) {
+      return;
+    }
+
     // Clear previous errors
     setErrors({});
 
@@ -280,7 +294,7 @@ export default function LoginScreen() {
               onPress={handleLogin}
               variant="primary"
               loading={isPending}
-              disabled={isPending}
+              disabled={isPending || isFillingFromParams}
               fullWidth
             />
 

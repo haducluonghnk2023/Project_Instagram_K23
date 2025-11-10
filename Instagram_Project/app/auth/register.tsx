@@ -142,12 +142,13 @@ export default function RegisterScreen() {
         // Đăng ký thành công - không tự động login
         // Chuyển sang trang login để user tự đăng nhập
         showToast("Đăng ký thành công! Vui lòng đăng nhập.", "success");
+        // Đợi toast hiển thị xong rồi mới navigate
         setTimeout(() => {
           router.replace({
             pathname: "/auth/login",
             params: { email, password },
           });
-        }, 500);
+        }, 1500); // Tăng timeout để đảm bảo toast hiển thị và user có thể thấy
       },
       onError: (error: any) => {
         const newErrors: {

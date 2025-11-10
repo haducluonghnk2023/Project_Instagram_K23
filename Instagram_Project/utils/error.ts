@@ -3,31 +3,36 @@
  */
 
 import { logger } from './logger';
-
-export interface AppError {
-  message: string;
-  code?: string;
-  statusCode?: number;
-}
+import { ApiError, AppError, isApiError, isAppError } from '@/types/error';
 
 /**
  * Extract error message from API error
  */
-export const getErrorMessage = (error: any): string => {
+export const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') return error;
   
-  if (error?.response?.data) {
-    const data = error.response.data;
-    if (typeof data === 'string') return data;
-    if (data?.data) {
-      if (typeof data.data === 'string') return data.data;
-      if (data.data?.message) return data.data.message;
+  if (isApiError(error)) {
+    const data = error.response?.data;
+    if (data) {
+      if (typeof data === 'string') return data;
+      if (data.data) {
+        if (typeof data.data === 'string') return data.data;
+        if (typeof data.data === 'object' && 'message' in data.data) {
+          return String(data.data.message);
+        }
+      }
+      if (data.message) return data.message;
+      if (data.error) return data.error;
     }
-    if (data?.message) return data.message;
-    if (data?.error) return data.error;
   }
   
-  if (error?.message) return error.message;
+  if (isAppError(error)) {
+    return error.message;
+  }
+  
+  if (error instanceof Error) {
+    return error.message;
+  }
   
   return 'Đã xảy ra lỗi. Vui lòng thử lại.';
 };
@@ -37,7 +42,7 @@ export const getErrorMessage = (error: any): string => {
  * Note: This function should be used with useToast hook in components
  * For backward compatibility, we keep the function but it won't show alerts
  */
-export const showErrorAlert = (error: any, title: string = 'Lỗi') => {
+export const showErrorAlert = (error: unknown, title: string = 'Lỗi'): string => {
   const message = getErrorMessage(error);
   logger.error('Error alert:', error);
   // Return message for useToast hook
@@ -47,9 +52,10 @@ export const showErrorAlert = (error: any, title: string = 'Lỗi') => {
 /**
  * Handle API error with logging
  */
-export const handleApiError = (error: any, context?: string): AppError => {
+export const handleApiError = (error: unknown, context?: string): AppError => {
   const message = getErrorMessage(error);
-  const statusCode = error?.response?.status;
+  const statusCode = isApiError(error) ? error.response?.status : undefined;
+  const code = isApiError(error) ? error.code : (error instanceof Error ? error.name : undefined);
   
   logger.error(`API Error${context ? ` in ${context}` : ''}:`, {
     message,
@@ -60,7 +66,7 @@ export const handleApiError = (error: any, context?: string): AppError => {
   return {
     message,
     statusCode,
-    code: error?.code,
+    code,
   };
 };
 

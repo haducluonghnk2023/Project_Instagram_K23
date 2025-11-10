@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE, API_PREFIX } from '@/constants/config';
+import { logger } from '@/utils/logger';
 
 // For Spring WebSocket with SockJS, we need to use a different approach
 // Since React Native doesn't support SockJS directly, we'll use a WebSocket polyfill
@@ -36,7 +37,7 @@ class WebSocketService {
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.warn('No token found, cannot connect WebSocket');
+        logger.warn('No token found, cannot connect WebSocket');
         this.isConnecting = false;
         return;
       }
@@ -47,18 +48,53 @@ class WebSocketService {
       //   → WebSocket URL = "ws://192.168.100.175:8080/ws/messages?token=..."
       // - Nếu API_BASE = "https://api.example.com"
       //   → WebSocket URL = "wss://api.example.com/ws/messages?token=..."
-      const baseUrl = API_BASE.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      const wsProtocol = API_BASE.startsWith('https') ? 'wss' : 'ws';
       
-      // Native WebSocket endpoint - URL được build tự động
-      const wsUrl = `${wsProtocol}://${baseUrl}/ws/messages?token=${encodeURIComponent(token)}`;
+      // Normalize API_BASE giống như axios-instance để đảm bảo có protocol và port
+      let normalizedBase = API_BASE.trim().replace(/\/+$/, ''); // Remove trailing slashes
       
-      console.log('Connecting to WebSocket:', wsUrl.replace(token, 'TOKEN'));
+      // If base doesn't start with http:// or https://, add http://
+      if (!normalizedBase.match(/^https?:\/\//)) {
+        normalizedBase = `http://${normalizedBase}`;
+      }
+      
+      // Check if it's an IP address or localhost
+      const ipPattern = /^https?:\/\/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?/;
+      const localhostPattern = /^https?:\/\/localhost(?::(\d+))?/;
+      
+      const ipMatch = normalizedBase.match(ipPattern);
+      const localhostMatch = normalizedBase.match(localhostPattern);
+      
+      // If it's an IP address or localhost without port, add default port 8080
+      if (ipMatch || localhostMatch) {
+        const match = ipMatch || localhostMatch;
+        // If no port is specified (group 2 is undefined), add default port
+        if (!match![2]) {
+          // Insert port before any path or end of string
+          normalizedBase = normalizedBase.replace(/(:\/\/[^\/:]+)(\/|$)/, '$1:8080$2');
+        }
+      }
+      
+      // Parse normalized URL để giữ lại port
+      let wsUrl: string;
+      try {
+        const url = new URL(normalizedBase);
+        const wsProtocol = url.protocol === 'https:' ? 'wss' : 'ws';
+        // Giữ lại hostname và port (nếu có)
+        const host = url.host; // host bao gồm cả port nếu có
+        wsUrl = `${wsProtocol}://${host}/ws/messages?token=${encodeURIComponent(token)}`;
+      } catch (error) {
+        // Fallback: parse thủ công nếu URL constructor không hoạt động
+        const baseUrl = normalizedBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const wsProtocol = normalizedBase.startsWith('https') ? 'wss' : 'ws';
+        wsUrl = `${wsProtocol}://${baseUrl}/ws/messages?token=${encodeURIComponent(token)}`;
+      }
+      
+      logger.log('Connecting to WebSocket:', wsUrl.replace(token, 'TOKEN'));
       
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
+        logger.log('WebSocket connected');
         this.isConnecting = false;
         reconnectAttempts = 0;
         // Notify listeners that connection is established
@@ -72,28 +108,39 @@ class WebSocketService {
           const data = JSON.parse(event.data);
           this.handleMessage(data);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          logger.error('Error parsing WebSocket message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        // Chỉ log error message, không log toàn bộ event object
+        const errorMessage = error?.message || 'Unknown WebSocket error';
+        logger.error('WebSocket error:', errorMessage);
         this.isConnecting = false;
       };
 
       this.ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
+        const closeReason = event.reason || `Code: ${event.code}`;
+        logger.log('WebSocket closed:', closeReason);
         this.isConnecting = false;
         this.ws = null;
         
         // Attempt to reconnect if not a normal closure
         if (event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
           this.scheduleReconnect();
+        } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          logger.warn('WebSocket: Max reconnect attempts reached');
         }
       };
-    } catch (error) {
-      console.error('Error connecting WebSocket:', error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Error connecting WebSocket:', errorMessage);
       this.isConnecting = false;
+      
+      // Attempt to reconnect on connection error
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        this.scheduleReconnect();
+      }
     }
   }
 
@@ -109,7 +156,7 @@ class WebSocketService {
   // Tăng dần thời gian chờ: 1s, 2s, 4s, 8s, ... tối đa 30s
   const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000);
 
-  console.log(`Scheduling WebSocket reconnect attempt ${reconnectAttempts} in ${delay}ms`);
+  logger.log(`Scheduling WebSocket reconnect attempt ${reconnectAttempts} in ${delay}ms`);
 
   // Tạo timer và lưu lại (ReturnType<typeof setTimeout> tương thích cả RN lẫn Node)
   this.reconnectTimer = setTimeout(() => {
@@ -124,7 +171,7 @@ class WebSocketService {
         try {
           listener(data);
         } catch (error) {
-          console.error('Error in WebSocket listener:', error);
+          logger.error('Error in WebSocket listener:', error);
         }
       });
     });
@@ -150,7 +197,7 @@ class WebSocketService {
     // This method is kept for compatibility but should not be used
     // to send messages to server - use REST API instead
     if (event !== 'connected') {
-      console.warn('Emit (not supported in Spring WebSocket):', event, data);
+      logger.warn('Emit (not supported in Spring WebSocket):', event, data);
     }
   }
 
@@ -166,7 +213,7 @@ class WebSocketService {
     }
 
     this.listeners.clear();
-    console.log('WebSocket disconnected');
+    logger.log('WebSocket disconnected');
   }
 
   isConnected(): boolean {

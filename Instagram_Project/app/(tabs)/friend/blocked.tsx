@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import { unblockUserApi, FriendInfo } from '@/services/friend.api';
 import { useBlockedUsers } from '@/hooks/useFriend';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { SwipeBackView, useToast, ConfirmDialog } from '@/components/common';
+import { getErrorMessage } from '@/utils/error';
 
 interface BlockedUserItemProps {
   blockedUser: FriendInfo;
@@ -35,20 +37,10 @@ const BlockedUserItem: React.FC<BlockedUserItemProps> = ({
 }) => {
   const profile = blockedUser.user.profile;
   const displayName = profile?.fullName || blockedUser.user.email || blockedUser.user.phone || 'Người dùng';
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleUnblock = () => {
-    Alert.alert(
-      'Gỡ chặn',
-      `Bạn có chắc chắn muốn gỡ chặn ${displayName}?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Gỡ chặn',
-          style: 'default',
-          onPress: () => onUnblock(blockedUser.userId, displayName),
-        },
-      ]
-    );
+    setShowConfirm(true);
   };
 
   return (
@@ -85,11 +77,25 @@ const BlockedUserItem: React.FC<BlockedUserItemProps> = ({
           <Text style={styles.unblockButtonText}>Gỡ chặn</Text>
         )}
       </TouchableOpacity>
+      <ConfirmDialog
+        visible={showConfirm}
+        title="Gỡ chặn"
+        message={`Bạn có chắc chắn muốn gỡ chặn ${displayName}?`}
+        confirmText="Gỡ chặn"
+        cancelText="Hủy"
+        type="info"
+        onConfirm={() => {
+          setShowConfirm(false);
+          onUnblock(blockedUser.userId, displayName);
+        }}
+        onCancel={() => setShowConfirm(false)}
+      />
     </View>
   );
 };
 
 export default function BlockedUsersScreen() {
+  const { showToast } = useToast();
   const { data: blockedUsers, isLoading, refetch } = useBlockedUsers();
   const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,15 +111,13 @@ export default function BlockedUsersScreen() {
     setUnblockingUserId(userId);
     try {
       await unblockUserApi(userId);
-      Alert.alert('Thành công', `Đã gỡ chặn ${userName}`);
+      showToast(`Đã gỡ chặn ${userName}`, 'success');
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['blockedUsers'] });
       queryClient.invalidateQueries({ queryKey: ['friends'] });
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể gỡ chặn người dùng.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể gỡ chặn người dùng.', 'error');
     } finally {
       setUnblockingUserId(null);
     }
@@ -134,8 +138,33 @@ export default function BlockedUsersScreen() {
 
   if (isLoading) {
     return (
+      <SwipeBackView enabled={true} style={styles.container}>
+        <ThemedView style={styles.container}>
+          <SafeAreaView edges={['top']} style={styles.safeArea}>
+            <View style={styles.header}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Ionicons name="arrow-back" size={24} color={Colors.text} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Người bị chặn</Text>
+              <View style={styles.backButton} />
+            </View>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          </SafeAreaView>
+        </ThemedView>
+      </SwipeBackView>
+    );
+  }
+
+  return (
+    <SwipeBackView enabled={true} style={styles.container}>
       <ThemedView style={styles.container}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
+          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
@@ -146,28 +175,6 @@ export default function BlockedUsersScreen() {
             <Text style={styles.headerTitle}>Người bị chặn</Text>
             <View style={styles.backButton} />
           </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
-        </SafeAreaView>
-      </ThemedView>
-    );
-  }
-
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color={Colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Người bị chặn</Text>
-          <View style={styles.backButton} />
-        </View>
 
         {/* Blocked Users List */}
         {blockedUsers && blockedUsers.length > 0 ? (
@@ -195,7 +202,8 @@ export default function BlockedUsersScreen() {
           </View>
         )}
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

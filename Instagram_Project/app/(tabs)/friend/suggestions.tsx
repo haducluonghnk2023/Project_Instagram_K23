@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,9 @@ import { searchUsersApi, sendFriendRequestApi, getFriendsApi, getFriendRequestsA
 import { UserInfo } from '@/types/auth';
 import { router } from 'expo-router';
 import { useMe } from '@/hooks/useAuth';
+import { SwipeBackView, useToast } from '@/components/common';
+import { getErrorMessage } from '@/utils/error';
+import { logger } from '@/utils/logger';
 
 interface SuggestionItemProps {
   user: UserInfo;
@@ -89,6 +92,7 @@ const SuggestionItem: React.FC<SuggestionItemProps> = ({
 
 export default function SuggestionsScreen() {
   const { data: currentUser, isLoading: isLoadingUser } = useMe();
+  const { showToast } = useToast();
   const [suggestions, setSuggestions] = useState<UserInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,8 +110,14 @@ export default function SuggestionsScreen() {
       // Lấy tất cả users, friends, và friend requests
       const [usersResponse, friendsResponse, requestsResponse] = await Promise.all([
         searchUsersApi(''),
-        getFriendsApi().catch(() => []),
-        getFriendRequestsApi().catch(() => []),
+        getFriendsApi().catch((error) => {
+          logger.error('Error loading friends:', error);
+          return [];
+        }),
+        getFriendRequestsApi().catch((error) => {
+          logger.error('Error loading friend requests:', error);
+          return [];
+        }),
       ]);
 
       const allUsers = usersResponse.users || [];
@@ -150,11 +160,9 @@ export default function SuggestionsScreen() {
       setSuggestions(filteredSuggestions);
       setSentRequestUserIds(newSentUserIds);
       setRequestIds(newRequestIds);
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể tải gợi ý.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể tải gợi ý.', 'error');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -175,7 +183,7 @@ export default function SuggestionsScreen() {
 
   const handleSendRequest = async (user: UserInfo) => {
     if (!user.phone) {
-      Alert.alert('Lỗi', 'Không thể gửi lời mời: Người dùng không có số điện thoại');
+      showToast('Không thể gửi lời mời: Người dùng không có số điện thoại', 'error');
       return;
     }
 
@@ -190,11 +198,9 @@ export default function SuggestionsScreen() {
         return newMap;
       });
       // Không hiển thị thông báo thành công và không xóa user khỏi danh sách
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể gửi lời mời. Vui lòng thử lại.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể gửi lời mời. Vui lòng thử lại.', 'error');
     } finally {
       setLoadingUserIds((prev) => {
         const newSet = new Set(prev);
@@ -225,11 +231,9 @@ export default function SuggestionsScreen() {
         return newMap;
       });
       // Không hiển thị thông báo
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error?.message || 'Không thể hủy lời mời. Vui lòng thử lại.'
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      showToast(errorMessage || 'Không thể hủy lời mời. Vui lòng thử lại.', 'error');
     } finally {
       setLoadingUserIds((prev) => {
         const newSet = new Set(prev);
@@ -251,6 +255,7 @@ export default function SuggestionsScreen() {
 
   if (isLoading || isLoadingUser || !currentUser?.id) {
     return (
+      <SwipeBackView enabled={true} style={styles.container}>
       <ThemedView style={styles.container}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={styles.header}>
@@ -267,13 +272,15 @@ export default function SuggestionsScreen() {
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
         </SafeAreaView>
-      </ThemedView>
+        </ThemedView>
+      </SwipeBackView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
+        <SafeAreaView edges={['top']} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -318,7 +325,8 @@ export default function SuggestionsScreen() {
           </View>
         )}
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

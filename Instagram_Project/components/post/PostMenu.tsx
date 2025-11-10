@@ -21,6 +21,7 @@ interface PostMenuProps {
   currentUserId: string;
   visible: boolean;
   onClose: () => void;
+  onPostDeleted?: (postId: string) => void;
 }
 
 export default function PostMenu({
@@ -28,6 +29,7 @@ export default function PostMenu({
   currentUserId,
   visible,
   onClose,
+  onPostDeleted,
 }: PostMenuProps) {
   const { mutate: updatePost, isPending: isUpdating } = useUpdatePost();
   const { mutate: deletePost, isPending: isDeleting } = useDeletePost();
@@ -56,10 +58,17 @@ export default function PostMenu({
     deletePost(post.id, {
       onSuccess: () => {
         showToast("Đã xóa bài viết", "success");
+        // Gọi callback sau khi xóa thành công để update UI ngay lập tức
+        // Hook đã invalidate queries, nhưng callback này giúp update local state nhanh hơn
+        if (onPostDeleted) {
+          onPostDeleted(post.id);
+        }
       },
       onError: (error: any) => {
+        // Nếu xóa thất bại, invalidate queries để refetch và hiển thị lại bài viết
         const { message } = showErrorFromException(error, "Không thể xóa bài viết");
         showToast(message, "error");
+        // Query sẽ tự động refetch và hiển thị lại bài viết
       },
     });
     setShowDeleteConfirm(false);

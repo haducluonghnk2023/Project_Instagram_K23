@@ -21,6 +21,8 @@ import { useReels } from "@/hooks/usePost";
 import { useToggleReaction } from "@/hooks/useReaction";
 import { Post } from "@/types/post";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { SwipeBackView } from "@/components/common";
+import { logger } from "@/utils/logger";
 
 const { width, height } = Dimensions.get("window");
 
@@ -63,18 +65,18 @@ const ReelItem: React.FC<ReelItemProps> = ({
       // Add a small delay before playing to ensure Video component is fully mounted
       const playTimer = setTimeout(() => {
         if (videoRef.current) {
-          videoRef.current.playAsync().catch((error) => {
-            console.error('Error playing video:', error);
-            setHasError(true);
-          });
+        videoRef.current.playAsync().catch((error) => {
+          logger.error('Error playing video:', error);
+          setHasError(true);
+        });
           setIsPlaying(true);
         }
       }, 50);
       return () => clearTimeout(playTimer);
     } else if (videoRef.current && !isActive) {
-      videoRef.current.pauseAsync().catch((error) => {
-        console.error('Error pausing video:', error);
-      });
+        videoRef.current.pauseAsync().catch((error) => {
+          logger.error('Error pausing video:', error);
+        });
       setIsPlaying(false);
     }
   }, [isActive, hasError, isVideoReady]);
@@ -390,7 +392,8 @@ export default function ReelsScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -447,7 +450,8 @@ export default function ReelsScreen() {
           }
         />
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 

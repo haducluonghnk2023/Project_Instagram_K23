@@ -39,7 +39,7 @@ export default function StoryViewerScreen() {
     userId: string;
     initialStoryIndex?: string;
   }>();
-  const { data: posts } = useUserPosts(userId || "");
+  const { data: posts } = useUserPosts(userId || "", 0, 10);
   const { data: currentUser } = useMe();
 
   // Filter stories (posts with video in last 24 hours, not reels)
@@ -104,7 +104,11 @@ export default function StoryViewerScreen() {
   };
 
   const handleClose = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/home');
+    }
   };
 
   const handlePause = () => {

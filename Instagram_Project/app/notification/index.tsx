@@ -23,6 +23,7 @@ import {
 } from '@/hooks/useNotification';
 import { Notification } from '@/types/notification';
 import { router } from 'expo-router';
+import { SwipeBackView } from '@/components/common';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -188,12 +189,19 @@ export default function NotificationScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.container}>
+      <SwipeBackView enabled={true} style={styles.container}>
+        <ThemedView style={styles.container}>
         <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home');
+                }
+              }}
             >
               <Ionicons name="arrow-back" size={24} color={Colors.text} />
             </TouchableOpacity>
@@ -204,13 +212,15 @@ export default function NotificationScreen() {
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
         </SafeAreaView>
-      </ThemedView>
+        </ThemedView>
+      </SwipeBackView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+    <SwipeBackView enabled={true} style={styles.container}>
+      <ThemedView style={styles.container}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -258,7 +268,8 @@ export default function NotificationScreen() {
           </View>
         )}
       </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SwipeBackView>
   );
 }
 
