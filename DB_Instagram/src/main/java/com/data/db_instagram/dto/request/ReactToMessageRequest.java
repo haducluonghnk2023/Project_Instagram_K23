@@ -1,0 +1,15 @@
+package com.data.db_instagram.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ReactToMessageRequest {
+    @NotBlank(message = "Emoji is required")
+    private String emoji; // e.g., "❤️", "👍", "😄", etc.
+}
+

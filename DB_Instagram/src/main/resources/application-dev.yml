@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: DB_Instagram
+  datasource:
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:db_instagram}?createDatabaseIfNotExist=true
+  jpa:
+    show-sql: false  # Tắt show-sql để giảm log, chỉ bật khi debug
+    hibernate:
+      # For development: use 'update' to auto-create/update tables
+      # NOTE: For production, use 'validate' and manage migrations with Flyway/Liquibase
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: false
+        # Batch loading để tránh N+1 query problem
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+jwt:
+  secret:
+    # For development only - use environment variable in production
+    key: ${JWT_SECRET_KEY:G1yZlT5+eV9Qm1vN8xYkP7a3rjV0oL2m9bQ1eYfH0kU=}
+  expired:
+    access: ${JWT_EXPIRED_ACCESS:43200}  # Access token: 12 hours for dev
+    refresh: ${JWT_EXPIRED_REFRESH:2592000}  # Refresh token: 30 days for dev
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8081,http://localhost:19006}
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:dlcfbiayq}
+  api-key: ${CLOUDINARY_API_KEY:518132578465253}
+  api-secret: ${CLOUDINARY_API_SECRET:IPSqvoALfA18DP0aVvrt9XJ844Y}
+
+logging:
+  level:
+    com.data.db_instagram: DEBUG
+    org.springframework.security: DEBUG
+
