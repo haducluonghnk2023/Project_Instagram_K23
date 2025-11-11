@@ -11,11 +11,14 @@ import com.data.db_instagram.model.Comments;
 import com.data.db_instagram.model.Posts;
 import com.data.db_instagram.model.Profiles;
 import com.data.db_instagram.model.Users;
+import com.data.db_instagram.model.Comment_tags;
 import com.data.db_instagram.repository.CommentsRepository;
+import com.data.db_instagram.repository.CommentTagsRepository;
 import com.data.db_instagram.repository.IUserRepository;
 import com.data.db_instagram.repository.PostsRepository;
 import com.data.db_instagram.repository.ProfilesRepository;
 import com.data.db_instagram.services.CommentService;
+import com.data.db_instagram.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +32,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CommentServiceImpl implements CommentService {
     private final CommentsRepository commentsRepository;
+    private final CommentTagsRepository commentTagsRepository;
     private final PostsRepository postsRepository;
     private final IUserRepository userRepository;
     private final ProfilesRepository profilesRepository;
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -67,6 +72,39 @@ public class CommentServiceImpl implements CommentService {
         comment.setCreatedAt(new Date());
         comment = commentsRepository.save(comment);
 
+        // Lưu tagged users
+        if (request.getTaggedUserIds() != null && !request.getTaggedUserIds().isEmpty()) {
+            for (UUID taggedUserId : request.getTaggedUserIds()) {
+                Comment_tags commentTag = new Comment_tags();
+                commentTag.setComment_id(comment.getId());
+                commentTag.setTagged_user_id(taggedUserId);
+                commentTag.setCreated_at(new Date());
+                commentTagsRepository.save(commentTag);
+            }
+        }
+
+        // Tạo notification cho post owner (chỉ nếu không phải comment của chính mình)
+        UUID postOwnerId = post.getUserId();
+        if (!postOwnerId.equals(userId)) {
+            // Chỉ tạo notification cho comment chính (không phải reply)
+            // Vì reply sẽ được xử lý riêng nếu cần
+            if (request.getParentCommentId() == null) {
+                String payload = "{\"postId\":\"" + postId + "\",\"commentId\":\"" + comment.getId() + "\"}";
+                notificationService.createNotification(postOwnerId, userId, "comment", payload);
+            }
+        }
+
+        // Tạo notification cho các user được tag trong comment
+        if (request.getTaggedUserIds() != null && !request.getTaggedUserIds().isEmpty()) {
+            String payload = "{\"postId\":\"" + postId + "\",\"commentId\":\"" + comment.getId() + "\"}";
+            for (UUID taggedUserId : request.getTaggedUserIds()) {
+                // Chỉ tạo notification nếu không phải chính mình và không phải post owner (đã có notification comment rồi)
+                if (!taggedUserId.equals(userId) && !taggedUserId.equals(postOwnerId)) {
+                    notificationService.createNotification(taggedUserId, userId, "comment_tag", payload);
+                }
+            }
+        }
+
         return buildCommentResponse(comment, userId);
     }
 
@@ -76,13 +114,37 @@ public class CommentServiceImpl implements CommentService {
         Comments comment = commentsRepository.findById(commentId)
                 .orElseThrow(() -> new HttpNotFound("Comment not found"));
 
-        if (!comment.getUserId().equals(userId)) {
-            throw new HttpForbidden("You can only delete your own comments");
+        // Lấy post để kiểm tra xem user có phải là chủ bài viết không
+        Posts post = postsRepository.findByIdAndIsDeletedFalse(comment.getPostId())
+                .orElseThrow(() -> new HttpNotFound("Post not found"));
+
+        UUID postOwnerId = post.getUserId();
+        UUID commentOwnerId = comment.getUserId();
+
+        // Cho phép xóa nếu:
+        // 1. User là chủ bài viết (có thể xóa tất cả comment)
+        // 2. User là người bình luận (chỉ có thể xóa comment của chính mình)
+        if (!postOwnerId.equals(userId) && !commentOwnerId.equals(userId)) {
+            throw new HttpForbidden("Bạn chỉ có thể xóa bình luận của chính mình hoặc chủ bài viết mới có thể xóa bình luận");
         }
 
+        // Xóa comment chính
         comment.setIsDeleted(true);
         comment.setUpdatedAt(new Date());
         commentsRepository.save(comment);
+
+        // Xóa tất cả replies của comment này (nếu có)
+        List<Comments> replies = commentsRepository.findByParentComment(commentId);
+        if (replies != null && !replies.isEmpty()) {
+            Date now = new Date();
+            for (Comments reply : replies) {
+                if (!reply.getIsDeleted()) { // Chỉ xóa nếu chưa bị xóa
+                    reply.setIsDeleted(true);
+                    reply.setUpdatedAt(now);
+                    commentsRepository.save(reply);
+                }
+            }
+        }
     }
 
     @Override
@@ -110,6 +172,12 @@ public class CommentServiceImpl implements CommentService {
         // Count replies
         long replyCount = commentsRepository.findByParentCommentAndIsDeletedFalseOrderByCreatedAtAsc(comment.getId()).size();
 
+        // Get tagged user IDs
+        List<UUID> taggedUserIds = commentTagsRepository.findByComment_id(comment.getId())
+                .stream()
+                .map(Comment_tags::getTagged_user_id)
+                .collect(Collectors.toList());
+
         return CommentResponse.builder()
                 .id(comment.getId())
                 .postId(comment.getPostId())
@@ -123,6 +191,7 @@ public class CommentServiceImpl implements CommentService {
                 .replyCount(replyCount)
                 .reactionCount(0) // TODO: Add comment reactions if needed
                 .hasReacted(false)
+                .taggedUserIds(taggedUserIds)
                 .build();
     }
 }

@@ -34,5 +34,44 @@ public interface NotificationsRepository extends JpaRepository<Notifications, UU
             @Param("type") String type,
             @Param("actorId") UUID actorId
     );
+    
+    // Kiểm tra xem đã có notification chưa đọc trong khoảng thời gian gần đây
+    @Query("SELECT COUNT(n) > 0 FROM Notifications n WHERE n.user_id = :userId " +
+           "AND n.type = :type AND n.actor_id = :actorId " +
+           "AND n.payload LIKE :payloadPattern " +
+           "AND n.is_read = false " +
+           "AND n.created_at >= :sinceTime")
+    boolean existsUnreadNotificationRecently(
+            @Param("userId") UUID userId,
+            @Param("actorId") UUID actorId,
+            @Param("type") String type,
+            @Param("payloadPattern") String payloadPattern,
+            @Param("sinceTime") java.util.Date sinceTime
+    );
+    
+    // Tìm notification chưa đọc theo userId, type, actorId và payload pattern
+    @Query("SELECT n FROM Notifications n WHERE n.user_id = :userId " +
+           "AND n.type = :type AND n.actor_id = :actorId " +
+           "AND n.payload LIKE :payloadPattern " +
+           "AND n.is_read = false " +
+           "ORDER BY n.created_at DESC")
+    List<Notifications> findUnreadByUserIdAndTypeAndActorIdAndPayloadLike(
+            @Param("userId") UUID userId,
+            @Param("actorId") UUID actorId,
+            @Param("type") String type,
+            @Param("payloadPattern") String payloadPattern
+    );
+    
+    // Kiểm tra xem đã có notification chưa đọc (không giới hạn thời gian)
+    @Query("SELECT COUNT(n) > 0 FROM Notifications n WHERE n.user_id = :userId " +
+           "AND n.type = :type AND n.actor_id = :actorId " +
+           "AND n.payload LIKE :payloadPattern " +
+           "AND n.is_read = false")
+    boolean existsUnreadNotification(
+            @Param("userId") UUID userId,
+            @Param("actorId") UUID actorId,
+            @Param("type") String type,
+            @Param("payloadPattern") String payloadPattern
+    );
 }
 

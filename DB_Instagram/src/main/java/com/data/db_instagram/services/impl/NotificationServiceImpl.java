@@ -41,6 +41,29 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public boolean hasUnreadNotificationRecently(UUID userId, UUID actorId, String type, String payloadPattern, int minutesAgo) {
+        Date sinceTime = new Date(System.currentTimeMillis() - (minutesAgo * 60 * 1000L));
+        return notificationsRepository.existsUnreadNotificationRecently(
+                userId, actorId, type, payloadPattern, sinceTime);
+    }
+
+    @Override
+    public boolean hasUnreadNotification(UUID userId, UUID actorId, String type, String payloadPattern) {
+        return notificationsRepository.existsUnreadNotification(
+                userId, actorId, type, payloadPattern);
+    }
+
+    @Override
+    @Transactional
+    public void deleteNotificationByUserIdAndTypeAndActorIdAndPayload(UUID userId, UUID actorId, String type, String payloadPattern) {
+        List<Notifications> notifications = notificationsRepository.findUnreadByUserIdAndTypeAndActorIdAndPayloadLike(
+                userId, actorId, type, payloadPattern);
+        if (!notifications.isEmpty()) {
+            notificationsRepository.deleteAll(notifications);
+        }
+    }
+
+    @Override
     public List<NotificationResponse> getNotifications(UUID userId) {
         List<Notifications> notifications = notificationsRepository.findByUserIdOrderByCreatedAtDesc(userId);
         return notifications.stream()

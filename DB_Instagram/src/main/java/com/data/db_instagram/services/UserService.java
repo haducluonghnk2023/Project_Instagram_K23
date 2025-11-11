@@ -1,5 +1,6 @@
 package com.data.db_instagram.services;
 
+import com.data.db_instagram.dto.request.ChangePasswordRequest;
 import com.data.db_instagram.dto.request.UpdateProfileRequest;
 import com.data.db_instagram.dto.response.UserInfo;
 
@@ -9,4 +10,5 @@ public interface UserService {
     UserInfo getCurrentUser(UUID userId);
     UserInfo getUserById(UUID userId);
     UserInfo updateProfile(UUID userId, UpdateProfileRequest request);
+    void changePassword(UUID userId, ChangePasswordRequest request);
 }

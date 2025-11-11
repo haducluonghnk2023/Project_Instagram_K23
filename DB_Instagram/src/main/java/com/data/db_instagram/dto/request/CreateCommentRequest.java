@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -16,5 +17,7 @@ public class CreateCommentRequest {
     private UUID parentCommentId; // For threaded comments
     
     private String imageUrl; // Optional image URL for comments with images
+    
+    private List<UUID> taggedUserIds; // List of user IDs tagged in the comment
 }
 

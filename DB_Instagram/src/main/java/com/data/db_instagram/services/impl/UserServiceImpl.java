@@ -1,8 +1,10 @@
 package com.data.db_instagram.services.impl;
 
+import com.data.db_instagram.dto.request.ChangePasswordRequest;
 import com.data.db_instagram.dto.request.UpdateProfileRequest;
 import com.data.db_instagram.dto.response.ProfileInfo;
 import com.data.db_instagram.dto.response.UserInfo;
+import com.data.db_instagram.exception.HttpBadRequest;
 import com.data.db_instagram.exception.HttpNotFound;
 import com.data.db_instagram.model.Profiles;
 import com.data.db_instagram.model.Users;
@@ -10,6 +12,7 @@ import com.data.db_instagram.repository.ProfilesRepository;
 import com.data.db_instagram.repository.IUserRepository;
 import com.data.db_instagram.services.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +24,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
     private final IUserRepository userRepository;
     private final ProfilesRepository profilesRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public UserInfo getCurrentUser(UUID userId) {
@@ -148,6 +152,27 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .profile(profileInfo)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new HttpNotFound("User not found with id: " + userId));
+
+        // Verify current password
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword_hash())) {
+            throw new HttpBadRequest("Mật khẩu hiện tại không đúng");
+        }
+
+        // Check if new password is the same as current password
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword_hash())) {
+            throw new HttpBadRequest("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
+
+        // Update password
+        user.setPassword_hash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }
 

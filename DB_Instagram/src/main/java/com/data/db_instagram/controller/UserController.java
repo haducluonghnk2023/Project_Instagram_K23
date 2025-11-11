@@ -1,5 +1,6 @@
 package com.data.db_instagram.controller;
 
+import com.data.db_instagram.dto.request.ChangePasswordRequest;
 import com.data.db_instagram.dto.request.UpdateProfileRequest;
 import com.data.db_instagram.dto.response.ResponseWrapper;
 import com.data.db_instagram.services.UserService;
@@ -54,6 +55,22 @@ public class UserController {
                                                 .status(HttpStatus.OK)
                                                 .code(HttpStatus.OK.value())
                                                 .data(userService.updateProfile(userId, request))
+                                                .build());
+        }
+
+        @PutMapping("/me/change-password")
+        public ResponseEntity<?> changePassword(
+                        @RequestHeader(value = "Authorization", required = false) String authorization,
+                        @Valid @RequestBody ChangePasswordRequest request) {
+                UUID userId = jwtUtils.extractUserIdFromToken(authorization);
+
+                userService.changePassword(userId, request);
+
+                return ResponseEntity.ok(
+                                ResponseWrapper.builder()
+                                                .status(HttpStatus.OK)
+                                                .code(HttpStatus.OK.value())
+                                                .data("Đổi mật khẩu thành công")
                                                 .build());
         }
 }

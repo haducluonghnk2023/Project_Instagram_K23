@@ -8,7 +8,9 @@ import java.util.UUID;
 
 @Data
 @Entity
-@Table(name = "post_reactions")
+@Table(name = "post_reactions", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"post_id", "user_id"})
+})
 public class Post_reactions {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

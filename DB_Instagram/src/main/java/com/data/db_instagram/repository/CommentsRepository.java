@@ -14,6 +14,8 @@ public interface CommentsRepository extends JpaRepository<Comments, UUID> {
     List<Comments> findByPostIdAndIsDeletedFalseOrderByCreatedAtDesc(UUID postId);
     List<Comments> findByPostIdAndParentCommentIsNullAndIsDeletedFalseOrderByCreatedAtDesc(UUID postId);
     List<Comments> findByParentCommentAndIsDeletedFalseOrderByCreatedAtAsc(UUID parentCommentId);
+    // Tìm tất cả replies (kể cả đã bị deleted) để xóa khi xóa parent comment
+    List<Comments> findByParentComment(UUID parentCommentId);
     long countByPostIdAndIsDeletedFalse(UUID postId);
     // Batch load comment counts for multiple posts - optimized for performance
     @Query("SELECT c.postId, COUNT(c) FROM Comments c WHERE c.postId IN :postIds AND c.isDeleted = false GROUP BY c.postId")

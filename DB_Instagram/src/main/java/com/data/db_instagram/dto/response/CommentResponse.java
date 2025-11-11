@@ -32,5 +32,8 @@ public class CommentResponse {
     // Reactions count
     private long reactionCount;
     private boolean hasReacted;
+    
+    // Tagged users
+    private List<UUID> taggedUserIds;
 }
 
