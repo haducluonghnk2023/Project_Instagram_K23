@@ -28,9 +28,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { ConfirmDialog } from "@/components/common";
 import { useToast } from "@/components/common/ToastProvider";
-import { showErrorFromException } from "@/utils/toast";
 import { SwipeBackView } from '@/components/common';
 
 export default function ProfileTab() {
@@ -40,7 +38,6 @@ export default function ProfileTab() {
   const { data: userInfo, isLoading, error, refetch } = useMe();
   const { mutate: updateProfile, isPending: isUpdatingAvatar } = useUpdateMe();
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { showToast } = useToast();
   
   // Get real data - using pagination
@@ -104,27 +101,12 @@ export default function ProfileTab() {
   const bio = profile?.bio || null;
   const avatar = profile?.avatarUrl || null;
 
-  const handleLogout = () => {
-    setShowLogoutConfirm(true);
-  };
-
-  const confirmLogout = async () => {
-    try {
-      await logout();
-      setShowLogoutConfirm(false);
-      // Navigation sẽ được xử lý tự động bởi RootLayoutNav khi isAuthenticated = false
-    } catch (error) {
-      setShowLogoutConfirm(false);
-      showToast("Không thể đăng xuất. Vui lòng thử lại.", "error");
-    }
-  };
-
   const handleEditProfile = () => {
     router.push("/profile/edit");
   };
 
   const handleSettings = () => {
-    showToast("Tính năng cài đặt sẽ được thêm sau", "info");
+    router.push("/profile/settings");
   };
 
   const handleAvatarPress = () => {
@@ -380,30 +362,8 @@ export default function ProfileTab() {
           ) : (
             <PostGrid posts={displayedPosts} onPostPress={handlePostPress} />
           )}
-
-          {/* Logout Button */}
-          <View style={styles.logoutContainer}>
-            <Button
-              title="Đăng xuất"
-              onPress={handleLogout}
-              variant="danger"
-              fullWidth
-              style={styles.logoutButton}
-            />
-          </View>
         </ScrollView>
       </SafeAreaView>
-
-      <ConfirmDialog
-        visible={showLogoutConfirm}
-        title="Đăng xuất"
-        message="Bạn có chắc chắn muốn đăng xuất?"
-        confirmText="Đăng xuất"
-        cancelText="Hủy"
-        type="warning"
-        onConfirm={confirmLogout}
-        onCancel={() => setShowLogoutConfirm(false)}
-      />
       </ThemedView>
     </SwipeBackView>
   );
@@ -581,13 +541,6 @@ const styles = StyleSheet.create({
   highlightLabel: {
     fontSize: FontSizes.xs,
     color: Colors.text,
-  },
-  logoutContainer: {
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xl * 2,
-  },
-  logoutButton: {
-    marginTop: Spacing.md,
   },
   errorText: {
     fontSize: FontSizes.md,

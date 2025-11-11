@@ -15,10 +15,10 @@ interface ConfirmDialogProps {
   title: string;
   message: string;
   confirmText?: string;
-  cancelText?: string;
+  cancelText?: string | null;
   onConfirm: () => void;
-  onCancel: () => void;
-  type?: 'danger' | 'warning' | 'info';
+  onCancel?: () => void;
+  type?: 'danger' | 'warning' | 'info' | 'success';
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -37,6 +37,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         return 'warning';
       case 'warning':
         return 'alert-circle';
+      case 'success':
+        return 'checkmark-circle';
       default:
         return 'information-circle';
     }
@@ -48,6 +50,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         return Colors.error;
       case 'warning':
         return Colors.warning || '#FF9800';
+      case 'success':
+        return '#4CAF50';
       default:
         return Colors.primary;
     }
@@ -58,12 +62,12 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onCancel}
+      onRequestClose={onCancel || (() => {})}
     >
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
-        onPress={onCancel}
+        onPress={onCancel || (() => {})}
       >
         <TouchableOpacity
           style={styles.container}
@@ -77,17 +81,21 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.message}>{message}</Text>
             <View style={styles.buttons}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={onCancel}
-              >
-                <Text style={styles.cancelButtonText}>{cancelText}</Text>
-              </TouchableOpacity>
+              {cancelText !== null && (
+                <TouchableOpacity
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={onCancel || (() => {})}
+                >
+                  <Text style={styles.cancelButtonText}>{cancelText}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[
                   styles.button,
                   styles.confirmButton,
                   type === 'danger' && styles.dangerButton,
+                  type === 'success' && styles.successButton,
+                  cancelText === null && styles.fullWidthButton,
                 ]}
                 onPress={onConfirm}
               >
@@ -95,6 +103,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                   style={[
                     styles.confirmButtonText,
                     type === 'danger' && styles.dangerButtonText,
+                    type === 'success' && styles.successButtonText,
                   ]}
                 >
                   {confirmText}
@@ -176,6 +185,15 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: '#fff',
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
+  },
+  successButtonText: {
+    color: '#fff',
+  },
+  fullWidthButton: {
+    width: '100%',
   },
 });
 

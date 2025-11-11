@@ -1,7 +1,11 @@
 import { Avatar } from "@/components/common";
 import { Colors } from "@/constants/colors";
 import { Spacing, FontSizes } from "@/constants/styles";
-import { useDeleteComment, useCommentReplies, useCreateComment } from "@/hooks/useComment";
+import {
+  useDeleteComment,
+  useCommentReplies,
+  useCreateComment,
+} from "@/hooks/useComment";
 import { Comment } from "@/types/post";
 import React, { useState } from "react";
 import {
@@ -17,21 +21,38 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useMe } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import { pickImageFromLibrary, takePhotoFromCamera, showImagePickerOptions } from "@/utils/imagePicker";
+import { useFriends } from "@/hooks/useFriend";
+import {
+  pickImageFromLibrary,
+  takePhotoFromCamera,
+  showImagePickerOptions,
+} from "@/utils/imagePicker";
 import { uploadImageApi } from "@/services/upload.api";
 
 interface CommentItemProps {
   comment: Comment;
   postId: string;
+  postOwnerId?: string; // ID của chủ bài viết
   onReply?: (parentCommentId: string, username: string) => void;
   isReply?: boolean;
 }
 
-export function CommentItem({ comment, postId, onReply, isReply = false }: CommentItemProps) {
+export function CommentItem({
+  comment,
+  postId,
+  postOwnerId,
+  onReply,
+  isReply = false,
+}: CommentItemProps) {
   const { mutate: deleteComment } = useDeleteComment();
   const { mutate: createComment, isPending: isReplying } = useCreateComment();
   const { data: currentUser } = useMe();
-  const { data: replies, isLoading: isLoadingReplies, refetch: refetchReplies } = useCommentReplies(postId, comment.id);
+  const { data: friends } = useFriends();
+  const {
+    data: replies,
+    isLoading: isLoadingReplies,
+    refetch: refetchReplies,
+  } = useCommentReplies(postId, comment.id);
   const queryClient = useQueryClient();
   const [showReplies, setShowReplies] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
@@ -39,6 +60,9 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
   const [replyImageUri, setReplyImageUri] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const isOwnComment = currentUser?.id === comment.userId;
+  const isPostOwner = currentUser?.id === postOwnerId;
+  // Hiển thị nút xóa nếu là comment của chính mình hoặc là chủ bài viết
+  const canDelete = isOwnComment || isPostOwner;
 
   const handleDelete = () => {
     Alert.alert("Xóa bình luận", "Bạn có chắc chắn muốn xóa bình luận này?", [
@@ -47,7 +71,12 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
         text: "Xóa",
         style: "destructive",
         onPress: () => {
-          deleteComment({ postId, commentId: comment.id });
+          // Truyền replyCount để tính đúng số lượng comments bị xóa
+          deleteComment({ 
+            postId, 
+            commentId: comment.id,
+            replyCount: comment.replyCount || 0,
+          });
         },
       },
     ]);
@@ -59,9 +88,13 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
 
   const handleReplyPress = () => {
     if (onReply) {
-      const username = comment.user?.profile?.fullName || comment.user?.email?.split("@")[0] || "user";
+      const username =
+        comment.user?.profile?.fullName ||
+        comment.user?.email?.split("@")[0] ||
+        "user";
       onReply(comment.id, username);
     } else {
+      // Fallback: hiển thị input ngay dưới comment nếu không có onReply callback
       setShowReplyInput(!showReplyInput);
     }
   };
@@ -76,7 +109,10 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
               setReplyImageUri(result.uri);
             }
           } catch (error: any) {
-            Alert.alert("Lỗi", error?.message || "Không thể chọn ảnh từ thư viện");
+            Alert.alert(
+              "Lỗi",
+              error?.message || "Không thể chọn ảnh từ thư viện"
+            );
           }
         },
         async () => {
@@ -112,7 +148,10 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
       // Upload ảnh khi submit
       if (replyImageUri) {
         try {
-          uploadedImageUrl = await uploadImageApi(replyImageUri, "instagram/comments");
+          uploadedImageUrl = await uploadImageApi(
+            replyImageUri,
+            "instagram/comments"
+          );
         } catch (error: any) {
           Alert.alert("Lỗi", error?.message || "Không thể upload ảnh");
           setIsUploadingImage(false);
@@ -129,28 +168,28 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
             imageUrl: uploadedImageUrl || undefined,
           },
         },
-      {
-        onSuccess: () => {
-          setReplyText("");
-          setReplyImageUri(null);
-          setShowReplyInput(false);
-          setShowReplies(true);
-          // Refetch replies ngay lập tức để hiển thị reply mới
-          setTimeout(() => {
-            queryClient.invalidateQueries({
-              queryKey: ["commentReplies", postId, comment.id],
-            });
-            refetchReplies();
-          }, 100);
-        },
-        onError: (error: any) => {
-          const errorMessage =
-            error?.response?.data?.data ||
-            error?.message ||
-            "Không thể phản hồi";
-          Alert.alert("Lỗi", errorMessage);
-        },
-      }
+        {
+          onSuccess: () => {
+            setReplyText("");
+            setReplyImageUri(null);
+            setShowReplyInput(false);
+            setShowReplies(true);
+            // Refetch replies ngay lập tức để hiển thị reply mới
+            setTimeout(() => {
+              queryClient.invalidateQueries({
+                queryKey: ["commentReplies", postId, comment.id],
+              });
+              refetchReplies();
+            }, 100);
+          },
+          onError: (error: any) => {
+            const errorMessage =
+              error?.response?.data?.data ||
+              error?.message ||
+              "Không thể phản hồi";
+            Alert.alert("Lỗi", errorMessage);
+          },
+        }
       );
     } finally {
       setIsUploadingImage(false);
@@ -178,15 +217,110 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
     "user";
   const avatarUrl = comment.user?.profile?.avatarUrl || null;
 
+  // Tạo map từ userId -> username để highlight
+  const taggedUsersMap = new Map<string, string>();
+  if (comment.taggedUserIds && friends) {
+    comment.taggedUserIds.forEach((taggedUserId) => {
+      const friend = friends.find((f) => f.userId === taggedUserId);
+      if (friend) {
+        const taggedUsername =
+          friend.user?.profile?.fullName ||
+          friend.user?.email?.split("@")[0] ||
+          "";
+        if (taggedUsername) {
+          taggedUsersMap.set(taggedUsername.toLowerCase(), taggedUserId);
+        }
+      }
+    });
+  }
+
+  // Render comment text với highlight cho tagged users
+  const renderCommentText = (text: string) => {
+    if (!text || taggedUsersMap.size === 0) {
+      return <Text style={styles.commentText}>{text}</Text>;
+    }
+
+    const parts: Array<{ text: string; isTagged: boolean }> = [];
+    let currentIndex = 0;
+
+    // Tìm tất cả tên được tag trong text (case-insensitive)
+    const taggedNames: Array<{ name: string; index: number; length: number }> =
+      [];
+    taggedUsersMap.forEach((userId, nameLower) => {
+      // Escape special regex characters
+      const escapedName = nameLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`\\b${escapedName}\\b`, "gi");
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        taggedNames.push({
+          name: match[0], // Giữ nguyên case gốc trong text
+          index: match.index,
+          length: match[0].length,
+        });
+      }
+    });
+
+    // Sắp xếp theo index
+    taggedNames.sort((a, b) => a.index - b.index);
+
+    // Loại bỏ overlaps
+    const filteredNames: Array<{
+      name: string;
+      index: number;
+      length: number;
+    }> = [];
+    taggedNames.forEach((tagged) => {
+      const overlaps = filteredNames.some(
+        (existing) =>
+          tagged.index < existing.index + existing.length &&
+          tagged.index + tagged.length > existing.index
+      );
+      if (!overlaps) {
+        filteredNames.push(tagged);
+      }
+    });
+
+    // Tạo parts
+    filteredNames.forEach(({ name, index, length }) => {
+      if (index > currentIndex) {
+        parts.push({
+          text: text.substring(currentIndex, index),
+          isTagged: false,
+        });
+      }
+      parts.push({ text: name, isTagged: true });
+      currentIndex = index + length;
+    });
+
+    if (currentIndex < text.length) {
+      parts.push({ text: text.substring(currentIndex), isTagged: false });
+    }
+
+    if (parts.length === 0) {
+      return <Text style={styles.commentText}>{text}</Text>;
+    }
+
+    return (
+      <Text style={styles.commentText}>
+        {parts.map((part, index) => (
+          <Text
+            key={index}
+            style={part.isTagged ? styles.taggedText : undefined}
+          >
+            {part.text}
+          </Text>
+        ))}
+      </Text>
+    );
+  };
+
   return (
     <View style={[styles.container, isReply && styles.replyContainer]}>
       <Avatar source={avatarUrl} size={isReply ? 28 : 32} showBorder />
       <View style={styles.content}>
         <View style={[styles.commentBubble, isReply && styles.replyBubble]}>
           <Text style={styles.username}>{username}</Text>
-          {comment.content && (
-            <Text style={styles.commentText}>{comment.content}</Text>
-          )}
+          {comment.content && renderCommentText(comment.content)}
           {comment.imageUrl && (
             <View style={styles.commentImageContainer}>
               <Image
@@ -202,7 +336,8 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
           {comment.replyCount > 0 && (
             <TouchableOpacity onPress={handleToggleReplies}>
               <Text style={styles.replyText}>
-                {showReplies ? "Ẩn" : "Xem"} {String(comment.replyCount)} phản hồi
+                {showReplies ? "Ẩn" : "Xem"} {String(comment.replyCount)} phản
+                hồi
               </Text>
             </TouchableOpacity>
           )}
@@ -212,7 +347,7 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
               <Text style={styles.replyText}>Phản hồi</Text>
             </TouchableOpacity>
           )}
-          {isOwnComment && (
+          {canDelete && (
             <TouchableOpacity onPress={handleDelete}>
               <Ionicons name="trash-outline" size={16} color={Colors.error} />
             </TouchableOpacity>
@@ -240,18 +375,29 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
                 {isUploadingImage ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
                 ) : (
-                  <Ionicons name="image-outline" size={20} color={Colors.primary} />
+                  <Ionicons
+                    name="image-outline"
+                    size={20}
+                    color={Colors.primary}
+                  />
                 )}
               </TouchableOpacity>
             </View>
             {replyImageUri && (
               <View style={styles.replyImagePreview}>
-                <Image source={{ uri: replyImageUri }} style={styles.replyImage} />
+                <Image
+                  source={{ uri: replyImageUri }}
+                  style={styles.replyImage}
+                />
                 <TouchableOpacity
                   style={styles.removeImageButton}
                   onPress={handleRemoveReplyImage}
                 >
-                  <Ionicons name="close-circle" size={24} color={Colors.error} />
+                  <Ionicons
+                    name="close-circle"
+                    size={24}
+                    color={Colors.error}
+                  />
                 </TouchableOpacity>
               </View>
             )}
@@ -266,9 +412,19 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
                 <Text style={styles.cancelText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.sendReplyButton, ((!replyText.trim() && !replyImageUri) || isReplying || isUploadingImage) && styles.sendReplyButtonDisabled]}
+                style={[
+                  styles.sendReplyButton,
+                  ((!replyText.trim() && !replyImageUri) ||
+                    isReplying ||
+                    isUploadingImage) &&
+                    styles.sendReplyButtonDisabled,
+                ]}
                 onPress={handleSubmitReply}
-                disabled={(!replyText.trim() && !replyImageUri) || isReplying || isUploadingImage}
+                disabled={
+                  (!replyText.trim() && !replyImageUri) ||
+                  isReplying ||
+                  isUploadingImage
+                }
               >
                 {isReplying ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -284,13 +440,18 @@ export function CommentItem({ comment, postId, onReply, isReply = false }: Comme
         {showReplies && (
           <View style={styles.repliesContainer}>
             {isLoadingReplies ? (
-              <ActivityIndicator size="small" color={Colors.primary} style={styles.repliesLoading} />
+              <ActivityIndicator
+                size="small"
+                color={Colors.primary}
+                style={styles.repliesLoading}
+              />
             ) : replies && replies.length > 0 ? (
               replies.map((reply) => (
                 <CommentItem
                   key={reply.id}
                   comment={reply}
                   postId={postId}
+                  postOwnerId={postOwnerId}
                   isReply={true}
                 />
               ))
@@ -339,6 +500,10 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     color: Colors.text,
     marginBottom: Spacing.xs,
+  },
+  taggedText: {
+    fontWeight: "600",
+    color: Colors.primary,
   },
   commentImageContainer: {
     marginTop: Spacing.sm,
@@ -494,4 +659,3 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
 });
-

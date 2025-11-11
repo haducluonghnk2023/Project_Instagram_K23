@@ -178,6 +178,7 @@ export const uploadVideoApi = async (uri: string, folder?: string): Promise<stri
   }
 
   try {
+    // Tăng timeout cho video upload (120 giây)
     const res = await uploadAxiosInstance.post<ApiResponse<UploadResponse>>(
       "/upload/video",
       formData,
@@ -185,29 +186,64 @@ export const uploadVideoApi = async (uri: string, folder?: string): Promise<stri
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 120000, // 120 seconds cho video lớn
       }
     );
 
     // Handle response structure
     const responseData = res.data;
     
+    // Log để debug
+    console.log("Upload video response:", JSON.stringify(responseData, null, 2));
+    
+    // Case 1: Standard structure - res.data.data.url (ResponseWrapper { data: UploadResponse { url } })
     if (responseData?.data?.url) {
+      console.log("Video uploaded successfully:", responseData.data.url);
       return responseData.data.url;
     }
     
+    // Case 2: Direct URL in data (fallback)
     if (responseData?.url) {
+      console.log("Video uploaded successfully (direct URL):", responseData.url);
       return responseData.url;
     }
     
+    // Case 3: Nested structure (fallback)
     if (responseData?.data?.data?.url) {
+      console.log("Video uploaded successfully (nested):", responseData.data.data.url);
       return responseData.data.data.url;
     }
     
+    // Log full response để debug
     console.error("Unexpected response structure:", JSON.stringify(responseData, null, 2));
     throw new Error("Không nhận được URL từ server. Cấu trúc response không đúng.");
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error("Upload video error:", error);
-    throw error;
+    
+    // Log chi tiết error để debug
+    if (error?.response) {
+      console.error("Error response status:", error.response.status);
+      console.error("Error response data:", JSON.stringify(error.response.data, null, 2));
+    }
+    
+    if (error?.message) {
+      console.error("Error message:", error.message);
+    }
+    
+    // Re-throw với message rõ ràng hơn
+    if (error?.response?.data?.data) {
+      throw new Error(error.response.data.data);
+    }
+    
+    if (error?.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    
+    if (error?.message) {
+      throw error;
+    }
+    
+    throw new Error("Không thể upload video. Vui lòng thử lại.");
   }
 };
 

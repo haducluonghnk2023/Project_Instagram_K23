@@ -24,6 +24,7 @@ import { Avatar } from "@/components/common";
 import { Ionicons } from "@expo/vector-icons";
 import { SwipeBackView, useToast } from "@/components/common";
 import { getErrorMessage } from "@/utils/error";
+import { formatBirthday } from "@/utils/date";
 
 export default function EditProfileScreen() {
   const { showToast } = useToast();
@@ -46,7 +47,8 @@ export default function EditProfileScreen() {
       setFullName(profile.fullName || "");
       setBio(profile.bio || "");
       setAvatarUrl(profile.avatarUrl || null);
-      setBirthday(profile.birthday || "");
+      // Format birthday to YYYY-MM-DD (remove time part if present)
+      setBirthday(formatBirthday(profile.birthday));
       setGender(profile.gender || "");
       setLocation(profile.location || "");
     }

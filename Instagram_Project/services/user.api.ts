@@ -31,4 +31,16 @@ export const updateMeApi = async (
   return res.data;
 };
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export const changePasswordApi = async (
+  body: ChangePasswordRequest
+): Promise<string> => {
+  const res = await api.put<string>("/users/me/change-password", body);
+  // api.put trả về ApiResponse<string> = { status, code, data: string }
+  return res.data;
+};
 

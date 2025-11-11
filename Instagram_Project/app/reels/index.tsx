@@ -121,8 +121,39 @@ const ReelItem: React.FC<ReelItemProps> = ({
     setIsMuted(!isMuted);
   };
 
+  const [localHasReacted, setLocalHasReacted] = useState(reel.hasReacted);
+  const isHoldingRef = useRef<boolean>(false);
+  
+  // Sync local state với reel state khi reel thay đổi
+  useEffect(() => {
+    setLocalHasReacted(reel.hasReacted);
+  }, [reel.hasReacted]);
+
+  const handleToggleReactionPressIn = () => {
+    // Khi bấm và giữ → tim ngay lập tức (UI update)
+    if (!localHasReacted) {
+      setLocalHasReacted(true);
+      isHoldingRef.current = true;
+    }
+  };
+
+  const handleToggleReactionPressOut = () => {
+    // Khi bỏ tay ra → hủy tim (UI update), sau đó gọi API
+    if (isHoldingRef.current) {
+      setLocalHasReacted(false);
+      isHoldingRef.current = false;
+      // Gọi API để cập nhật DB (unlike)
+      toggleReaction(reel.id);
+    }
+  };
+
   const handleToggleReaction = () => {
-    toggleReaction(reel.id);
+    // Khi tap nhanh → tim ngay (UI update), sau đó gọi API
+    if (!isHoldingRef.current) {
+      const newState = !localHasReacted;
+      setLocalHasReacted(newState);
+      toggleReaction(reel.id);
+    }
   };
 
   if (!videoUrl || !videoUrl.trim()) {
@@ -193,12 +224,14 @@ const ReelItem: React.FC<ReelItemProps> = ({
             <TouchableOpacity
               style={styles.actionButton}
               onPress={handleToggleReaction}
+              onPressIn={handleToggleReactionPressIn}
+              onPressOut={handleToggleReactionPressOut}
               disabled={isTogglingReaction}
             >
               <Ionicons
-                name={reel.hasReacted ? "heart" : "heart-outline"}
+                name={localHasReacted ? "heart" : "heart-outline"}
                 size={32}
-                color={reel.hasReacted ? Colors.error : "#fff"}
+                color={localHasReacted ? Colors.error : "#fff"}
               />
               <Text style={styles.actionText}>{String(reel.reactionCount)}</Text>
             </TouchableOpacity>
@@ -262,12 +295,14 @@ const ReelItem: React.FC<ReelItemProps> = ({
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleToggleReaction}
+            onPressIn={handleToggleReactionPressIn}
+            onPressOut={handleToggleReactionPressOut}
             disabled={isTogglingReaction}
           >
             <Ionicons
-              name={reel.hasReacted ? "heart" : "heart-outline"}
+              name={localHasReacted ? "heart" : "heart-outline"}
               size={32}
-              color={reel.hasReacted ? Colors.error : "#fff"}
+              color={localHasReacted ? Colors.error : "#fff"}
             />
             <Text style={styles.actionText}>{String(reel.reactionCount)}</Text>
           </TouchableOpacity>

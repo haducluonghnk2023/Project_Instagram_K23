@@ -1,11 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toggleReactionApi } from "@/services/reaction.api";
 import { Post } from "@/types/post";
+import * as Haptics from 'expo-haptics';
 
 export const useToggleReaction = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (postId: string) => toggleReactionApi(postId),
+    onMutate: async (postId) => {
+      // Haptic feedback khi like/unlike
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
     onSuccess: (response, postId) => {
       // Response có thể chứa thông tin về trạng thái reaction mới
       // Nếu không có, chúng ta sẽ update optimistic và để server sync sau
@@ -61,6 +66,10 @@ export const useToggleReaction = () => {
           return old;
         }
       );
+      
+      // Invalidate notifications để cập nhật thông báo mới
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unreadCount"] });
     },
   });
 };

@@ -80,9 +80,11 @@ export const useDeleteComment = () => {
     mutationFn: ({
       postId,
       commentId,
+      replyCount = 0, // Số lượng replies của comment này
     }: {
       postId: string;
       commentId: string;
+      replyCount?: number; // Thêm replyCount để tính đúng số lượng comments bị xóa
     }) => deleteCommentApi(postId, commentId),
     onSuccess: (_, variables) => {
       // Invalidate comments để refetch danh sách comments
@@ -90,15 +92,22 @@ export const useDeleteComment = () => {
         queryKey: ["comments", variables.postId],
       });
       
-      // Update post trong cache để giảm comment count (optimistic update)
-      // Không refetch toàn bộ feed để tránh làm mất posts
+      // Invalidate tất cả comment replies queries của comment này
+      queryClient.invalidateQueries({
+        queryKey: ["commentReplies", variables.postId, variables.commentId],
+      });
+      
+      // Tính số lượng comments bị xóa = 1 (comment chính) + replyCount (số replies)
+      const deletedCount = 1 + (variables.replyCount || 0);
+      
+      // Update post trong cache để giảm comment count đúng số lượng
       queryClient.setQueriesData<Post>(
         { queryKey: ["posts", variables.postId] },
         (old: Post | undefined) => {
           if (old) {
             return {
               ...old,
-              commentCount: Math.max((old.commentCount || 0) - 1, 0),
+              commentCount: Math.max((old.commentCount || 0) - deletedCount, 0),
             };
           }
           return old;
@@ -116,7 +125,7 @@ export const useDeleteComment = () => {
           if (old) {
             return old.map((post) =>
               post.id === variables.postId
-                ? { ...post, commentCount: Math.max((post.commentCount || 0) - 1, 0) }
+                ? { ...post, commentCount: Math.max((post.commentCount || 0) - deletedCount, 0) }
                 : post
             );
           }

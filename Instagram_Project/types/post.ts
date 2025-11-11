@@ -60,11 +60,13 @@ export interface Comment {
   replyCount: number;
   reactionCount: number;
   hasReacted: boolean;
+  taggedUserIds?: string[];
 }
 
 export interface CreateCommentRequest {
   content: string;
   parentCommentId?: string;
   imageUrl?: string;
+  taggedUserIds?: string[];
 }
 

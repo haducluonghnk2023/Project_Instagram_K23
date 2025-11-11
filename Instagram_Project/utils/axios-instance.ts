@@ -39,13 +39,13 @@ export const axiosInstance = axios.create({
   timeout: 15000, // Default timeout for normal requests
 });
 
-// Instance for uploads with longer timeout
+// Instance for uploads with timeout (120 seconds for video, can be overridden per request)
 export const uploadAxiosInstance = axios.create({
   baseURL,
   headers: {
     Accept: "application/json",
   },
-  timeout: 300000, // 5 minutes
+  timeout: 120000, // 120 seconds - reasonable timeout for video uploads
 });
 
 export const setAuthToken = (token: string | null) => {
@@ -118,21 +118,29 @@ const setupResponseInterceptor = (instance: typeof axiosInstance) => {
       
       // Handle 401 Unauthorized
       if (status === 401) {
-        // Token expired or invalid - clear it
-        try {
-          const { invalidateAuth } = await import("@/contexts/AuthContext");
-          await invalidateAuth();
-        } catch (e) {
-          // Fallback: clear token directly
+        // Check if this is a public endpoint (login/register) - don't logout for these
+        const requestUrl = error.config?.url || '';
+        const isPublicEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+        
+        if (!isPublicEndpoint) {
+          // Token expired or invalid - clear it (only for protected endpoints)
           try {
-            await AsyncStorage.removeItem("token");
-            setAuthToken(null);
-          } catch (err) {
-            console.error("Error clearing token:", err);
+            const { invalidateAuth } = await import("@/contexts/AuthContext");
+            await invalidateAuth();
+          } catch (e) {
+            // Fallback: clear token directly
+            try {
+              await AsyncStorage.removeItem("token");
+              setAuthToken(null);
+            } catch (err) {
+              console.error("Error clearing token:", err);
+            }
           }
+          // Return a more user-friendly error for protected endpoints
+          return Promise.reject(new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
         }
-        // Return a more user-friendly error
-        return Promise.reject(new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
+        // For public endpoints (login/register), pass through the original error
+        // so the component can handle it with detailed error messages
       }
       
       return Promise.reject(error);

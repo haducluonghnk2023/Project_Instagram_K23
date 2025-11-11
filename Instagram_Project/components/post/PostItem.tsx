@@ -4,7 +4,7 @@ import { Spacing, FontSizes } from "@/constants/styles";
 import { useToggleReaction } from "@/hooks/useReaction";
 import { useSavePost, useUnsavePost } from "@/hooks/useSavedPost";
 import { useMe } from "@/hooks/useAuth";
-import { Post } from "@/types/post";
+import { Post, Comment } from "@/types/post";
 import { router } from "expo-router";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
@@ -19,10 +19,14 @@ import {
   NativeSyntheticEvent,
   Modal,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Video, ResizeMode } from "expo-av";
+import { useQuery } from "@tanstack/react-query";
+import { getPostCommentsApi } from "@/services/comment.api";
 import PostMenu from "./PostMenu";
+import { CommentItem } from "./CommentItem";
 
 const { width, height } = Dimensions.get("window");
 
@@ -42,14 +46,54 @@ export const PostItem = React.memo(({ post, onCommentPress, onPostDeleted }: Pos
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [showPostMenu, setShowPostMenu] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const modalScrollViewRef = useRef<ScrollView>(null);
   
   const isOwner = useMemo(() => post.userId === currentUser?.id, [post.userId, currentUser?.id]);
+  
+  const [localHasReacted, setLocalHasReacted] = useState(post.hasReacted);
+  const isHoldingRef = useRef<boolean>(false);
+
+  // Load comments khi showComments = true
+  // Sử dụng custom query để control enabled state
+  const { data: comments, isLoading: isLoadingComments } = useQuery<Comment[]>({
+    queryKey: ["comments", post.id],
+    queryFn: () => getPostCommentsApi(post.id),
+    enabled: showComments && !!post.id,
+  });
+  
+  // Sync local state với post state khi post thay đổi
+  useEffect(() => {
+    setLocalHasReacted(post.hasReacted);
+  }, [post.hasReacted]);
+
+  const handleLikePressIn = useCallback(() => {
+    // Khi bấm và giữ → tim ngay lập tức (UI update)
+    if (!localHasReacted) {
+      setLocalHasReacted(true);
+      isHoldingRef.current = true;
+    }
+  }, [localHasReacted]);
+
+  const handleLikePressOut = useCallback(() => {
+    // Khi bỏ tay ra → hủy tim (UI update), sau đó gọi API
+    if (isHoldingRef.current) {
+      setLocalHasReacted(false);
+      isHoldingRef.current = false;
+      // Gọi API để cập nhật DB (unlike)
+      toggleReaction(post.id);
+    }
+  }, [toggleReaction, post.id]);
 
   const handleLike = useCallback(() => {
-    toggleReaction(post.id);
-  }, [toggleReaction, post.id]);
+    // Khi tap nhanh → tim ngay (UI update), sau đó gọi API
+    if (!isHoldingRef.current) {
+      const newState = !localHasReacted;
+      setLocalHasReacted(newState);
+      toggleReaction(post.id);
+    }
+  }, [toggleReaction, post.id, localHasReacted]);
 
   const handleSave = useCallback(() => {
     if (post.isSaved) {
@@ -85,6 +129,10 @@ export const PostItem = React.memo(({ post, onCommentPress, onPostDeleted }: Pos
       router.push(`/post/detail/${post.id}`);
     }
   }, [onCommentPress, post.id]);
+
+  const handleToggleComments = useCallback(() => {
+    setShowComments(!showComments);
+  }, [showComments]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
@@ -345,12 +393,14 @@ export const PostItem = React.memo(({ post, onCommentPress, onPostDeleted }: Pos
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleLike}
+            onPressIn={handleLikePressIn}
+            onPressOut={handleLikePressOut}
             disabled={isPending}
           >
             <Ionicons
-              name={post.hasReacted ? "heart" : "heart-outline"}
+              name={localHasReacted ? "heart" : "heart-outline"}
               size={24}
-              color={post.hasReacted ? Colors.error : Colors.text}
+              color={localHasReacted ? Colors.error : Colors.text}
             />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleComment}>
@@ -388,11 +438,35 @@ export const PostItem = React.memo(({ post, onCommentPress, onPostDeleted }: Pos
 
       {/* Post Comments */}
       {post.commentCount > 0 && (
-        <TouchableOpacity style={styles.comments} onPress={handleComment}>
-          <Text style={styles.commentsText}>
-            Xem tất cả {String(post.commentCount)} bình luận
-          </Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity style={styles.comments} onPress={handleToggleComments}>
+            <Text style={styles.commentsText}>
+              {showComments ? "Thu gọn" : `Xem tất cả ${String(post.commentCount)} bình luận`}
+            </Text>
+          </TouchableOpacity>
+          
+          {/* Comments List - hiển thị khi showComments = true */}
+          {showComments && (
+            <View style={styles.commentsList}>
+              {isLoadingComments ? (
+                <View style={styles.commentsLoading}>
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                </View>
+              ) : comments && comments.length > 0 ? (
+                comments.map((comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    postId={post.id}
+                    postOwnerId={post.userId}
+                  />
+                ))
+              ) : (
+                <Text style={styles.noCommentsText}>Chưa có bình luận nào</Text>
+              )}
+            </View>
+          )}
+        </>
       )}
 
       {/* Post Time */}
@@ -502,6 +576,21 @@ const styles = StyleSheet.create({
   commentsText: {
     fontSize: FontSizes.sm,
     color: Colors.textSecondary,
+  },
+  commentsList: {
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  commentsLoading: {
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+  },
+  noCommentsText: {
+    fontSize: FontSizes.sm,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+    paddingVertical: Spacing.sm,
   },
   time: {
     fontSize: FontSizes.xs,

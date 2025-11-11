@@ -48,6 +48,12 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
         return 'person-add-outline';
       case 'friend_accept':
         return 'checkmark-circle-outline';
+      case 'post_reaction':
+        return 'heart';
+      case 'comment':
+        return 'chatbubble-outline';
+      case 'comment_tag':
+        return 'at-outline';
       default:
         return 'notifications-outline';
     }
@@ -61,6 +67,12 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
         return 'đã gửi lời mời kết bạn';
       case 'friend_accept':
         return 'đã chấp nhận lời mời kết bạn';
+      case 'post_reaction':
+        return 'đã thích bài viết của bạn';
+      case 'comment':
+        return 'đã bình luận bài viết của bạn';
+      case 'comment_tag':
+        return 'đã tag bạn trong bình luận';
       default:
         return 'có thông báo mới';
     }
@@ -129,6 +141,28 @@ export default function NotificationScreen() {
       router.push('/(tabs)/friend/requests');
     } else if (notification.type === 'friend_accept' && notification.actorId) {
       router.push(`/profile?userId=${notification.actorId}`);
+    } else if (notification.type === 'post_reaction') {
+      // Parse payload to get postId
+      try {
+        const payload = JSON.parse(notification.payload || '{}');
+        if (payload.postId) {
+          router.push(`/post/detail/${payload.postId}`);
+        }
+      } catch (e) {
+        // If parsing fails, just go to home
+        router.push('/(tabs)/home');
+      }
+    } else if (notification.type === 'comment' || notification.type === 'comment_tag') {
+      // Parse payload to get postId
+      try {
+        const payload = JSON.parse(notification.payload || '{}');
+        if (payload.postId) {
+          router.push(`/post/detail/${payload.postId}`);
+        }
+      } catch (e) {
+        // If parsing fails, just go to home
+        router.push('/(tabs)/home');
+      }
     }
   };
 

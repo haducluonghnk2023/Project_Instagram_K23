@@ -22,6 +22,7 @@ import { router } from 'expo-router';
 import { SwipeBackView, useToast } from '@/components/common';
 import { useFriends } from '@/hooks/useFriend';
 import { getErrorMessage } from '@/utils/error';
+import * as Haptics from 'expo-haptics';
 
 interface SearchResultItemProps {
   user: UserInfo;
@@ -136,16 +137,28 @@ export default function SearchScreen() {
       return;
     }
 
+    // Haptic feedback khi tìm kiếm
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     setIsSearching(true);
     try {
       const response = await searchUsersApi(searchQuery.trim());
       setSearchResults(response.users || []);
       // Load sent requests để biết user nào đã gửi request
       await loadSentRequests();
+      
+      // Haptic feedback khi có kết quả
+      if (response.users && response.users.length > 0) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       showToast(errorMessage || 'Không thể tìm kiếm. Vui lòng thử lại.', 'error');
       setSearchResults([]);
+      // Haptic feedback khi có lỗi
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsSearching(false);
     }

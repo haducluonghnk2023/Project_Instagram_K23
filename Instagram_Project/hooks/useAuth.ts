@@ -1,5 +1,5 @@
 import { loginApi, registerApi } from "@/services/auth.api";
-import { getMeApi, getUserByIdApi, updateMeApi, UpdateProfileRequest } from "@/services/user.api";
+import { getMeApi, getUserByIdApi, updateMeApi, UpdateProfileRequest, changePasswordApi, ChangePasswordRequest } from "@/services/user.api";
 import { LoginRequest, RegisterRequest, UserInfo } from "@/types/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -83,5 +83,11 @@ export const useUpdateMe = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },
+  });
+};
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: (body: ChangePasswordRequest) => changePasswordApi(body),
   });
 };

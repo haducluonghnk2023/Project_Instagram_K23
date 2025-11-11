@@ -176,30 +176,70 @@ export default function LoginScreen() {
                 errorMessage = serverData.error;
               }
               
-              // Map các message tiếng Anh sang tiếng Việt
-              if (errorMessage.toLowerCase().includes("invalid credentials") || 
-                  errorMessage.toLowerCase().includes("wrong password") ||
-                  errorMessage.toLowerCase().includes("password incorrect")) {
+              // Map error message vào field tương ứng dựa trên nội dung message
+              const lowerMessage = errorMessage.toLowerCase();
+              
+              // Kiểm tra lỗi mật khẩu
+              if (
+                lowerMessage.includes("sai mật khẩu") ||
+                lowerMessage.includes("wrong password") ||
+                lowerMessage.includes("password incorrect") ||
+                lowerMessage.includes("invalid password") ||
+                lowerMessage.includes("mật khẩu không đúng")
+              ) {
                 newErrors.password = "Sai mật khẩu. Vui lòng kiểm tra lại.";
-              } else if (errorMessage.toLowerCase().includes("user not found") || 
-                         errorMessage.toLowerCase().includes("email not found") ||
-                         errorMessage.toLowerCase().includes("account not found") ||
-                         errorMessage.toLowerCase().includes("email không tồn tại")) {
+              }
+              // Kiểm tra lỗi email không tồn tại
+              else if (
+                lowerMessage.includes("email không tồn tại") ||
+                lowerMessage.includes("email not found") ||
+                lowerMessage.includes("user not found") ||
+                lowerMessage.includes("account not found") ||
+                lowerMessage.includes("không tồn tại trong hệ thống")
+              ) {
                 newErrors.email = "Email không tồn tại trong hệ thống.";
-              } else if (errorMessage.toLowerCase().includes("account is deactivated") ||
-                         errorMessage.toLowerCase().includes("account deactivated")) {
+              }
+              // Kiểm tra tài khoản bị vô hiệu hóa
+              else if (
+                lowerMessage.includes("tài khoản đã bị vô hiệu hóa") ||
+                lowerMessage.includes("account is deactivated") ||
+                lowerMessage.includes("account deactivated") ||
+                lowerMessage.includes("account disabled")
+              ) {
                 newErrors.general = "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ hỗ trợ.";
-              } else if (errorMessage.toLowerCase().includes("email is required") ||
-                         errorMessage.toLowerCase().includes("email không được để trống")) {
+              }
+              // Kiểm tra validation errors
+              else if (
+                lowerMessage.includes("email is required") ||
+                lowerMessage.includes("email không được để trống")
+              ) {
                 newErrors.email = "Email không được để trống";
-              } else if (errorMessage.toLowerCase().includes("email must be valid") ||
-                         errorMessage.toLowerCase().includes("email không hợp lệ")) {
+              } else if (
+                lowerMessage.includes("email must be valid") ||
+                lowerMessage.includes("email không hợp lệ")
+              ) {
                 newErrors.email = "Email không hợp lệ. Vui lòng nhập đúng định dạng email";
-              } else if (errorMessage.toLowerCase().includes("password is required") ||
-                         errorMessage.toLowerCase().includes("mật khẩu không được để trống")) {
+              } else if (
+                lowerMessage.includes("password is required") ||
+                lowerMessage.includes("mật khẩu không được để trống")
+              ) {
                 newErrors.password = "Mật khẩu không được để trống";
-              } else if (status === 401) {
-                newErrors.password = "Email hoặc mật khẩu không đúng.";
+              }
+              // Xử lý theo status code nếu không match message
+              else if (status === 401) {
+                // Nếu không có message cụ thể, hiển thị lỗi chung
+                if (errorMessage) {
+                  // Thử phân tích message để xác định field
+                  if (lowerMessage.includes("email") || lowerMessage.includes("tồn tại")) {
+                    newErrors.email = errorMessage;
+                  } else if (lowerMessage.includes("mật khẩu") || lowerMessage.includes("password")) {
+                    newErrors.password = errorMessage;
+                  } else {
+                    newErrors.general = errorMessage;
+                  }
+                } else {
+                  newErrors.general = "Email hoặc mật khẩu không đúng.";
+                }
               } else if (status === 403) {
                 newErrors.general = "Bạn không có quyền truy cập.";
               } else if (status === 404) {
