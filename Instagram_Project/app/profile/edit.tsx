@@ -113,6 +113,7 @@ export default function EditProfileScreen() {
       {
         onSuccess: () => {
           refetch();
+          showToast("Đã cập nhật hồ sơ thành công!", "success");
           // Quay về trang profile thay vì back (có thể back về trang khác)
           router.replace("/(tabs)/profile");
         },

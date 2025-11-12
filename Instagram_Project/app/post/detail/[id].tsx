@@ -21,24 +21,40 @@ import {
   Keyboard,
   Image,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { pickImageFromLibrary, takePhotoFromCamera, showImagePickerOptions } from "@/utils/imagePicker";
+import {
+  pickImageFromLibrary,
+  takePhotoFromCamera,
+  showImagePickerOptions,
+} from "@/utils/imagePicker";
 import { uploadImageApi } from "@/services/upload.api";
 import { SwipeBackView, Avatar } from "@/components/common";
 
 export default function PostDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
-  const { data: post, isLoading, error } = usePost(id as string);
-  const { data: comments, isLoading: isLoadingComments } = usePostComments(id as string);
+  // Xử lý id an toàn: có thể là string, string[] hoặc undefined
+  const postId = Array.isArray(id) ? id[0] : id;
+  const { data: post, isLoading, error } = usePost(postId || "");
+  const { data: comments, isLoading: isLoadingComments } = usePostComments(
+    postId || ""
+  );
   const { mutate: createComment, isPending } = useCreateComment();
   const [commentText, setCommentText] = useState("");
   const [commentImageUri, setCommentImageUri] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<{ commentId: string; username: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{
+    commentId: string;
+    username: string;
+  } | null>(null);
   const [showFriendSuggestions, setShowFriendSuggestions] = useState(false);
   const [friendSuggestions, setFriendSuggestions] = useState<any[]>([]);
-  const [taggedUsers, setTaggedUsers] = useState<Map<string, string>>(new Map()); // Map<userId, username>
+  const [taggedUsers, setTaggedUsers] = useState<Map<string, string>>(
+    new Map()
+  ); // Map<userId, username>
   const [currentTagStart, setCurrentTagStart] = useState<number>(-1);
   const commentInputRef = useRef<TextInput>(null);
   const { data: friends } = useFriends();
@@ -46,10 +62,10 @@ export default function PostDetailScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
-    const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", (e) => {
       setKeyboardHeight(e.endCoordinates.height);
     });
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
       setKeyboardHeight(0);
     });
 
@@ -69,7 +85,10 @@ export default function PostDetailScreen() {
               setCommentImageUri(result.uri);
             }
           } catch (error: any) {
-            Alert.alert("Lỗi", error?.message || "Không thể chọn ảnh từ thư viện");
+            Alert.alert(
+              "Lỗi",
+              error?.message || "Không thể chọn ảnh từ thư viện"
+            );
           }
         },
         async () => {
@@ -96,18 +115,19 @@ export default function PostDetailScreen() {
     setReplyingTo({ commentId, username });
     // Tự động điền @username vào input
     setCommentText(`@${username} `);
-    
+
     // Tìm userId của user được reply từ friends list
     if (friends) {
-      const repliedUser = friends.find(f => {
-        const friendUsername = f.user?.profile?.fullName || f.user?.email?.split('@')[0] || '';
+      const repliedUser = friends.find((f) => {
+        const friendUsername =
+          f.user?.profile?.fullName || f.user?.email?.split("@")[0] || "";
         return friendUsername.toLowerCase() === username.toLowerCase();
       });
       if (repliedUser) {
         setTaggedUsers(new Map().set(repliedUser.userId, username));
       }
     }
-    
+
     // Focus input sau một chút để đảm bảo UI đã render
     setTimeout(() => {
       commentInputRef.current?.focus();
@@ -123,23 +143,30 @@ export default function PostDetailScreen() {
 
   const handleCommentTextChange = (text: string) => {
     setCommentText(text);
-    
+
     // Detect @ symbol
-    const lastAtIndex = text.lastIndexOf('@');
+    const lastAtIndex = text.lastIndexOf("@");
     if (lastAtIndex !== -1) {
       // Check if @ is followed by space or at end (not part of a tag)
       const afterAt = text.substring(lastAtIndex + 1);
-      const nextSpaceIndex = afterAt.indexOf(' ');
-      const tagText = nextSpaceIndex === -1 ? afterAt : afterAt.substring(0, nextSpaceIndex);
-      
+      const nextSpaceIndex = afterAt.indexOf(" ");
+      const tagText =
+        nextSpaceIndex === -1 ? afterAt : afterAt.substring(0, nextSpaceIndex);
+
       // If @ is at the end or followed by text without space, show suggestions
-      if (tagText.length === 0 || (!tagText.includes(' ') && tagText.length < 20)) {
+      if (
+        tagText.length === 0 ||
+        (!tagText.includes(" ") && tagText.length < 20)
+      ) {
         setCurrentTagStart(lastAtIndex);
         if (friends && friends.length > 0) {
           const searchText = tagText.toLowerCase();
           const filtered = friends
-            .filter(friend => {
-              const name = friend.user?.profile?.fullName || friend.user?.email?.split('@')[0] || '';
+            .filter((friend) => {
+              const name =
+                friend.user?.profile?.fullName ||
+                friend.user?.email?.split("@")[0] ||
+                "";
               return name.toLowerCase().includes(searchText);
             })
             .slice(0, 5); // Limit to 5 suggestions
@@ -157,23 +184,30 @@ export default function PostDetailScreen() {
 
   const handleSelectFriend = (friend: any) => {
     if (currentTagStart === -1) return;
-    
-    const username = friend.user?.profile?.fullName || friend.user?.email?.split('@')[0] || 'user';
+
+    const username =
+      friend.user?.profile?.fullName ||
+      friend.user?.email?.split("@")[0] ||
+      "user";
     const userId = friend.userId;
-    
+
     // Replace @tagText with username (without @)
     const beforeAt = commentText.substring(0, currentTagStart);
     const afterAt = commentText.substring(currentTagStart + 1);
-    const nextSpaceIndex = afterAt.indexOf(' ');
-    const tagText = nextSpaceIndex === -1 ? afterAt : afterAt.substring(0, nextSpaceIndex);
-    
-    const newText = beforeAt + username + (nextSpaceIndex === -1 ? ' ' : afterAt.substring(nextSpaceIndex));
-    
+    const nextSpaceIndex = afterAt.indexOf(" ");
+    const tagText =
+      nextSpaceIndex === -1 ? afterAt : afterAt.substring(0, nextSpaceIndex);
+
+    const newText =
+      beforeAt +
+      username +
+      (nextSpaceIndex === -1 ? " " : afterAt.substring(nextSpaceIndex));
+
     setCommentText(newText);
     setTaggedUsers(new Map(taggedUsers).set(userId, username));
     setShowFriendSuggestions(false);
     setCurrentTagStart(-1);
-    
+
     // Focus back to input
     setTimeout(() => {
       commentInputRef.current?.focus();
@@ -193,7 +227,10 @@ export default function PostDetailScreen() {
       // Upload ảnh khi submit
       if (commentImageUri) {
         try {
-          uploadedImageUrl = await uploadImageApi(commentImageUri, "instagram/comments");
+          uploadedImageUrl = await uploadImageApi(
+            commentImageUri,
+            "instagram/comments"
+          );
         } catch (error: any) {
           Alert.alert("Lỗi", error?.message || "Không thể upload ảnh");
           setIsUploadingImage(false);
@@ -203,7 +240,7 @@ export default function PostDetailScreen() {
 
       createComment(
         {
-          postId: id as string,
+          postId: postId || "",
           data: {
             content: commentText.trim() || "",
             imageUrl: uploadedImageUrl || undefined,
@@ -237,7 +274,9 @@ export default function PostDetailScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={[CommonStyles.container, CommonStyles.containerCentered]}>
+      <ThemedView
+        style={[CommonStyles.container, CommonStyles.containerCentered]}
+      >
         <SafeAreaView edges={["top"]} style={CommonStyles.container}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </SafeAreaView>
@@ -247,7 +286,9 @@ export default function PostDetailScreen() {
 
   if (error || !post) {
     return (
-      <ThemedView style={[CommonStyles.container, CommonStyles.containerCentered]}>
+      <ThemedView
+        style={[CommonStyles.container, CommonStyles.containerCentered]}
+      >
         <SafeAreaView edges={["top"]} style={CommonStyles.container}>
           <Text style={styles.errorText}>
             Không thể tải bài viết. Vui lòng thử lại.
@@ -256,12 +297,12 @@ export default function PostDetailScreen() {
             style={styles.retryButton}
             onPress={() => {
               if (from) {
-                router.push(decodeURIComponent(from));
+                router.push(decodeURIComponent(from) as any);
               } else {
                 if (router.canGoBack()) {
                   router.back();
                 } else {
-                  router.replace('/(tabs)/home');
+                  router.replace("/(tabs)/home");
                 }
               }
             }}
@@ -277,7 +318,7 @@ export default function PostDetailScreen() {
   const handleBack = () => {
     if (from) {
       // Nếu có thông tin về nơi đến từ đâu, navigate về đó
-      const decodedFrom = decodeURIComponent(from);
+      const decodedFrom = decodeURIComponent(from) as any;
       // Kiểm tra xem có thể back được không, nếu không thì push
       if (router.canGoBack()) {
         router.back();
@@ -289,155 +330,193 @@ export default function PostDetailScreen() {
       if (router.canGoBack()) {
         router.back();
       } else {
-        router.replace('/(tabs)/home');
+        router.replace("/(tabs)/home");
       }
     }
   };
 
   return (
-    <SwipeBackView enabled={true} style={CommonStyles.container} onBack={handleBack}>
+    <SwipeBackView
+      enabled={true}
+      style={CommonStyles.container}
+      onBack={handleBack}
+    >
       <ThemedView style={CommonStyles.container}>
         <SafeAreaView edges={["top"]} style={CommonStyles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={handleBack}
-            style={styles.backButton}
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Bài viết</Text>
+            <View style={styles.headerRight} />
+          </View>
+
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={CommonStyles.container}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Bài viết</Text>
-          <View style={styles.headerRight} />
-        </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Post */}
+              <PostItem
+                post={post}
+                onPostDeleted={() => {
+                  // Khi xóa bài viết từ detail screen, quay về màn hình trước
+                  handleBack();
+                }}
+              />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={CommonStyles.container}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-        >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Post */}
-            <PostItem 
-              post={post} 
-              onPostDeleted={() => {
-                // Khi xóa bài viết từ detail screen, quay về màn hình trước
-                handleBack();
-              }}
-            />
+              {/* Comments Section */}
+              <View style={styles.commentsSection}>
+                <Text style={styles.commentsTitle}>
+                  Bình luận ({comments?.length || 0})
+                </Text>
 
-            {/* Comments Section */}
-            <View style={styles.commentsSection}>
-              <Text style={styles.commentsTitle}>
-                Bình luận ({comments?.length || 0})
-              </Text>
-
-              {isLoadingComments ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                </View>
-              ) : comments && comments.length > 0 ? (
-                comments.map((comment) => (
-                  <CommentItem 
-                    key={comment.id} 
-                    comment={comment} 
-                    postId={post.id}
-                    postOwnerId={post.userId}
-                    onReply={handleReply}
-                  />
-                ))
-              ) : (
-                <Text style={styles.noCommentsText}>Chưa có bình luận nào</Text>
-              )}
-            </View>
-          </ScrollView>
-
-          {/* Comment Input */}
-          <SafeAreaView edges={['bottom']} style={styles.commentInputSafeArea}>
-            <View style={styles.commentInputWrapper}>
-            {commentImageUri && (
-              <View style={styles.commentImagePreview}>
-                <Image source={{ uri: commentImageUri }} style={styles.commentImage} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={handleRemoveCommentImage}
-                >
-                  <Ionicons name="close-circle" size={24} color={Colors.error} />
-                </TouchableOpacity>
+                {isLoadingComments ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  </View>
+                ) : comments && comments.length > 0 ? (
+                  comments.map((comment) => (
+                    <CommentItem
+                      key={comment.id}
+                      comment={comment}
+                      postId={post.id}
+                      postOwnerId={post.userId}
+                      onReply={handleReply}
+                    />
+                  ))
+                ) : (
+                  <Text style={styles.noCommentsText}>
+                    Chưa có bình luận nào
+                  </Text>
+                )}
               </View>
-            )}
-            <View style={styles.commentInputContainer}>
-              <View style={styles.commentInputInnerWrapper}>
-                <TextInput
-                  ref={commentInputRef}
-                  style={styles.commentInput}
-                  placeholder="Thêm bình luận..."
-                  value={commentText}
-                  onChangeText={handleCommentTextChange}
-                  multiline
-                  maxLength={500}
-                  placeholderTextColor={Colors.textSecondary}
-                />
-                {showFriendSuggestions && friendSuggestions.length > 0 && (
-                  <View style={styles.friendSuggestionsContainer}>
-                    {friendSuggestions.map((friend) => {
-                      const username = friend.user?.profile?.fullName || friend.user?.email?.split('@')[0] || 'user';
-                      const avatarUrl = friend.user?.profile?.avatarUrl || null;
-                      return (
-                        <TouchableOpacity
-                          key={friend.userId}
-                          style={styles.friendSuggestionItem}
-                          onPress={() => handleSelectFriend(friend)}
-                        >
-                          <Avatar source={avatarUrl} size={40} showBorder={false} />
-                          <Text style={styles.friendSuggestionName}>{username}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+            </ScrollView>
+
+            {/* Comment Input */}
+            <SafeAreaView
+              edges={["bottom"]}
+              style={styles.commentInputSafeArea}
+            >
+              <View style={styles.commentInputWrapper}>
+                {commentImageUri && (
+                  <View style={styles.commentImagePreview}>
+                    <Image
+                      source={{ uri: commentImageUri }}
+                      style={styles.commentImage}
+                    />
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={handleRemoveCommentImage}
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={24}
+                        color={Colors.error}
+                      />
+                    </TouchableOpacity>
                   </View>
                 )}
+                <View style={styles.commentInputContainer}>
+                  <View style={styles.commentInputInnerWrapper}>
+                    <TextInput
+                      ref={commentInputRef}
+                      style={styles.commentInput}
+                      placeholder="Thêm bình luận..."
+                      value={commentText}
+                      onChangeText={handleCommentTextChange}
+                      multiline
+                      maxLength={500}
+                      placeholderTextColor={Colors.textSecondary}
+                    />
+                    {showFriendSuggestions && friendSuggestions.length > 0 && (
+                      <View style={styles.friendSuggestionsContainer}>
+                        {friendSuggestions.map((friend) => {
+                          const username =
+                            friend.user?.profile?.fullName ||
+                            friend.user?.email?.split("@")[0] ||
+                            "user";
+                          const avatarUrl =
+                            friend.user?.profile?.avatarUrl || null;
+                          return (
+                            <TouchableOpacity
+                              key={friend.userId}
+                              style={styles.friendSuggestionItem}
+                              onPress={() => handleSelectFriend(friend)}
+                            >
+                              <Avatar
+                                source={avatarUrl}
+                                size={40}
+                                showBorder={false}
+                              />
+                              <Text style={styles.friendSuggestionName}>
+                                {username}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                  {replyingTo && (
+                    <TouchableOpacity
+                      style={styles.cancelReplyButton}
+                      onPress={handleCancelReply}
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={20}
+                        color={Colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.attachImageButton}
+                    onPress={handlePickCommentImage}
+                    disabled={isUploadingImage}
+                  >
+                    {isUploadingImage ? (
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    ) : (
+                      <Ionicons
+                        name="image-outline"
+                        size={20}
+                        color={Colors.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.sendButton,
+                      ((!commentText.trim() && !commentImageUri) ||
+                        isPending ||
+                        isUploadingImage) &&
+                        styles.sendButtonDisabled,
+                    ]}
+                    onPress={handleSubmitComment}
+                    disabled={
+                      (!commentText.trim() && !commentImageUri) ||
+                      isPending ||
+                      isUploadingImage
+                    }
+                  >
+                    {isPending ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="send" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-              {replyingTo && (
-                <TouchableOpacity 
-                  style={styles.cancelReplyButton}
-                  onPress={handleCancelReply}
-                >
-                  <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={styles.attachImageButton}
-                onPress={handlePickCommentImage}
-                disabled={isUploadingImage}
-              >
-                {isUploadingImage ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                ) : (
-                  <Ionicons name="image-outline" size={20} color={Colors.primary} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  ((!commentText.trim() && !commentImageUri) || isPending || isUploadingImage) && styles.sendButtonDisabled,
-                ]}
-                onPress={handleSubmitComment}
-                disabled={(!commentText.trim() && !commentImageUri) || isPending || isUploadingImage}
-              >
-                {isPending ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
-            </View>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+            </SafeAreaView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </ThemedView>
     </SwipeBackView>
   );
@@ -505,6 +584,9 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     paddingVertical: Spacing.xl,
+  },
+  commentInputSafeArea: {
+    backgroundColor: Colors.background,
   },
   commentInputWrapper: {
     backgroundColor: Colors.background,

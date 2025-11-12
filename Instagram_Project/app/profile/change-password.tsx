@@ -144,15 +144,31 @@ export default function ChangePasswordScreen() {
                 // Xử lý validation errors (400 Bad Request với Map<String, String>)
                 const validationErrors = serverData.data;
                 
-                // Map errors theo field
-                if (validationErrors.currentPassword) {
-                  newErrors.currentPassword = validationErrors.currentPassword;
-                }
-                if (validationErrors.newPassword) {
-                  newErrors.newPassword = validationErrors.newPassword;
-                }
+                // Map tất cả errors cùng lúc bằng Object.entries()
+                Object.entries(validationErrors).forEach(([field, message]) => {
+                  if (typeof message === 'string') {
+                    // Map field name từ backend sang frontend field name
+                    const fieldMap: Record<string, keyof typeof newErrors> = {
+                      'currentPassword': 'currentPassword',
+                      'newPassword': 'newPassword',
+                      'confirmPassword': 'confirmPassword',
+                    };
+                    
+                    const mappedField = fieldMap[field];
+                    if (mappedField) {
+                      newErrors[mappedField] = message;
+                    } else {
+                      // Nếu field không có trong map, thêm vào general error
+                      if (!newErrors.general) {
+                        newErrors.general = message;
+                      } else {
+                        newErrors.general += `\n${message}`;
+                      }
+                    }
+                  }
+                });
 
-                // Nếu không có field cụ thể, lấy first error
+                // Nếu không có field cụ thể nào được map, lấy first error
                 if (Object.keys(newErrors).length === 0) {
                   const firstError = Object.values(validationErrors)[0];
                   if (typeof firstError === 'string') {

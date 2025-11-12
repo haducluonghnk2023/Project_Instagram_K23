@@ -26,6 +26,7 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useUnreadNotificationCount } from "@/hooks/useNotification";
 import { useFriends } from "@/hooks/useFriend";
 import { useMe } from "@/hooks/useAuth";
+import { useSavedPosts } from "@/hooks/useSavedPost";
 import { isStory, filterRegularPosts } from "@/utils/post";
 import { getUserDisplayName, formatUsername, getAvatarUrl } from "@/utils/user";
 import { LIMITS } from "@/constants/limits";
@@ -43,22 +44,38 @@ export default function HomeTab() {
   const { data: unreadCount } = useUnreadNotificationCount();
   const { data: friends } = useFriends();
   const { data: currentUser } = useMe();
+  const { data: savedPosts } = useSavedPosts();
   const swipeBackHandlers = useSwipeBack(false); // Disable for home tab (root screen)
+
+  // Tạo Set các post IDs đã được lưu để merge vào feed posts
+  const savedPostIds = React.useMemo(() => {
+    if (!savedPosts || !Array.isArray(savedPosts)) return new Set<string>();
+    return new Set(savedPosts.map(post => post.id));
+  }, [savedPosts]);
+
+  // Merge isSaved từ savedPosts vào feed posts
+  const postsWithSavedStatus = React.useMemo(() => {
+    if (!posts || !Array.isArray(posts)) return posts;
+    return posts.map(post => ({
+      ...post,
+      isSaved: savedPostIds.has(post.id),
+    }));
+  }, [posts, savedPostIds]);
 
   // Accumulate posts for infinite scroll
   React.useEffect(() => {
-    if (posts && Array.isArray(posts)) {
+    if (postsWithSavedStatus && Array.isArray(postsWithSavedStatus)) {
       if (page === 0) {
         // Luôn update allPosts khi page === 0, kể cả khi empty array
         // Điều này đảm bảo khi xóa bài viết cuối cùng, UI sẽ hiển thị empty state
         // Và khi có post mới từ cache, nó sẽ được hiển thị ngay
-        setAllPosts(posts);
+        setAllPosts(postsWithSavedStatus);
       } else {
         // Load more: chỉ thêm posts mới, không reset
         setAllPosts((prev) => {
           // Tránh duplicate posts
           const existingIds = new Set(prev.map(p => p.id));
-          const newPosts = posts.filter(p => !existingIds.has(p.id));
+          const newPosts = postsWithSavedStatus.filter(p => !existingIds.has(p.id));
           if (newPosts.length > 0) {
             return [...prev, ...newPosts];
           }
@@ -66,7 +83,7 @@ export default function HomeTab() {
         });
       }
     }
-  }, [posts, page]);
+  }, [postsWithSavedStatus, page]);
 
   // Refetch feed when screen is focused (when returning from other screens)
   // This ensures we have the latest posts, especially after creating a new post
@@ -84,11 +101,13 @@ export default function HomeTab() {
       if (page === 0) {
         // Đợi một chút để đảm bảo navigation đã hoàn tất
         const timer = setTimeout(() => {
+          // Refetch feed và savedPosts để đảm bảo isSaved được sync đúng
           refetch();
+          queryClient.invalidateQueries({ queryKey: ["savedPosts"] });
         }, 300);
         return () => clearTimeout(timer);
       }
-    }, [page, refetch])
+    }, [page, refetch, queryClient])
   );
 
   // Check if user has story (posts with video in last 24 hours, NOT reels)
