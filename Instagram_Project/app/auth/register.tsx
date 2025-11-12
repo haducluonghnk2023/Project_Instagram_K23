@@ -80,53 +80,52 @@ export default function RegisterScreen() {
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
 
   const handleRegister = () => {
-    // Clear previous errors
-    setErrors({});
+    // Thu thập tất cả lỗi vào một object trước
+    const validationErrors: {
+      email?: string;
+      fullName?: string;
+      phone?: string;
+      password?: string;
+      confirmPassword?: string;
+      general?: string;
+    } = {};
 
-    // Validate
-    let hasError = false;
-
+    // Validate email
     if (!email.trim()) {
-      setErrors((prev) => ({ ...prev, email: "Email không được để trống" }));
-      hasError = true;
+      validationErrors.email = "Email không được để trống";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErrors((prev) => ({ ...prev, email: "Email không hợp lệ" }));
-      hasError = true;
+      validationErrors.email = "Email không hợp lệ";
     }
 
+    // Validate fullName
     if (!fullName.trim()) {
-      setErrors((prev) => ({ ...prev, fullName: "Họ và tên không được để trống" }));
-      hasError = true;
+      validationErrors.fullName = "Họ và tên không được để trống";
     }
 
+    // Validate phone
     if (!phone.trim()) {
-      setErrors((prev) => ({ ...prev, phone: "Số điện thoại không được để trống" }));
-      hasError = true;
+      validationErrors.phone = "Số điện thoại không được để trống";
     } else if (!/^[0-9]{10,15}$/.test(phone)) {
-      setErrors((prev) => ({ ...prev, phone: "Số điện thoại phải gồm 10-15 chữ số (0-9)" }));
-      hasError = true;
+      validationErrors.phone = "Số điện thoại phải gồm 10-15 chữ số (0-9)";
     }
 
+    // Validate password
     if (!password.trim()) {
-      setErrors((prev) => ({ ...prev, password: "Mật khẩu không được để trống" }));
-      hasError = true;
+      validationErrors.password = "Mật khẩu không được để trống";
     } else if (!strongPasswordRegex.test(password)) {
-      setErrors((prev) => ({
-        ...prev,
-        password: "Mật khẩu phải >=8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt.",
-      }));
-      hasError = true;
+      validationErrors.password = "Mật khẩu phải >=8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt.";
     }
 
+    // Validate confirmPassword
     if (!confirmPassword.trim()) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "Xác nhận mật khẩu không được để trống" }));
-      hasError = true;
+      validationErrors.confirmPassword = "Xác nhận mật khẩu không được để trống";
     } else if (password !== confirmPassword) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "Mật khẩu xác nhận không khớp" }));
-      hasError = true;
+      validationErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
     }
 
-    if (hasError) {
+    // Nếu có lỗi, hiển thị tất cả cùng lúc
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 

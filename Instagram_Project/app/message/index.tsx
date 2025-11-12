@@ -70,24 +70,26 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     >
       <View style={styles.avatarContainer}>
         <Avatar source={avatarUrl} size={56} showBorder={false} />
-        {conversation.unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>
-              {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
-            </Text>
-          </View>
-        )}
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
           <Text style={styles.conversationName} numberOfLines={1}>
             {displayName}
           </Text>
-          {lastMessage && (
-            <Text style={styles.conversationTime}>
-              {formatTime(lastMessage.createdAt)}
-            </Text>
-          )}
+          <View style={styles.headerRight}>
+            {lastMessage && (
+              <Text style={styles.conversationTime}>
+                {formatTime(lastMessage.createdAt)}
+              </Text>
+            )}
+            {conversation.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.conversationFooter}>
           <Text
@@ -99,7 +101,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           >
             {lastMessageText || "Chưa có tin nhắn"}
           </Text>
-          {conversation.unreadCount > 0 && <View style={styles.unreadDot} />}
         </View>
       </View>
     </TouchableOpacity>
@@ -259,23 +260,18 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   unreadBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
     backgroundColor: Colors.error,
     borderRadius: 10,
     minWidth: 20,
-    height: 18,
-    paddingHorizontal: 4,
+    height: 20,
+    paddingHorizontal: 6,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: Colors.background,
   },
   unreadBadgeText: {
     color: Colors.textLight,
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "700",
   },
   conversationContent: {
     flex: 1,
@@ -292,15 +288,18 @@ const styles = StyleSheet.create({
     color: Colors.text,
     flex: 1,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
   conversationTime: {
     fontSize: FontSizes.xs,
     color: Colors.textSecondary,
-    marginLeft: Spacing.sm,
   },
   conversationFooter: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
   },
   lastMessage: {
     fontSize: FontSizes.sm,
@@ -310,13 +309,6 @@ const styles = StyleSheet.create({
   lastMessageUnread: {
     fontWeight: "600",
     color: Colors.text,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-    marginLeft: Spacing.sm,
   },
   separator: {
     height: 1,

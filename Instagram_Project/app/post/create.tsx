@@ -6,8 +6,8 @@ import { CommonStyles, Spacing, FontSizes } from "@/constants/styles";
 import { useCreatePost } from "@/hooks/usePost";
 import { uploadImageApi, uploadVideoApi } from "@/services/upload.api";
 import { showImagePickerOptions, pickImageFromLibrary, pickMultipleImagesFromLibrary, takePhotoFromCamera, showMediaPickerOptions, pickVideoFromLibrary, takeVideoFromCamera, showVideoPickerOptions } from "@/utils/imagePicker";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -25,6 +25,16 @@ import { Video, ResizeMode } from "expo-av";
 import { useToast } from "@/components/common/ToastProvider";
 import { showErrorFromException } from "@/utils/toast";
 import { SwipeBackView } from "@/components/common";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const UPLOAD_STATE_KEY = "@create_post_upload_state";
+
+interface UploadState {
+  isUploading: boolean;
+  media: Array<{ uri: string; type: 'image' | 'video' }>;
+  content: string;
+  visibility: "public" | "private" | "friends";
+}
 
 export default function CreatePostScreen() {
   const { mutate: createPost, isPending } = useCreatePost();
@@ -34,6 +44,34 @@ export default function CreatePostScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "private" | "friends">("public");
   const { showToast } = useToast();
+
+  // Restore upload state khi quay lại màn hình
+  useFocusEffect(
+    useCallback(() => {
+      const restoreUploadState = async () => {
+        try {
+          const savedState = await AsyncStorage.getItem(UPLOAD_STATE_KEY);
+          if (savedState) {
+            const state: UploadState = JSON.parse(savedState);
+            // Chỉ restore nếu đang upload
+            if (state.isUploading) {
+              setMedia(state.media);
+              setContent(state.content);
+              setVisibility(state.visibility);
+              setIsUploading(true);
+              showToast("Đang tiếp tục upload ảnh/video...", "info");
+            } else {
+              // Clear state nếu không còn upload
+              await AsyncStorage.removeItem(UPLOAD_STATE_KEY);
+            }
+          }
+        } catch (error) {
+          console.error("Error restoring upload state:", error);
+        }
+      };
+      restoreUploadState();
+    }, [showToast])
+  );
 
   const handleSelectMedia = async () => {
     showMediaPickerOptions(
@@ -119,6 +157,15 @@ export default function CreatePostScreen() {
 
     setIsUploading(true);
     
+    // Lưu state vào AsyncStorage để persist khi navigate
+    const uploadState: UploadState = {
+      isUploading: true,
+      media,
+      content,
+      visibility,
+    };
+    await AsyncStorage.setItem(UPLOAD_STATE_KEY, JSON.stringify(uploadState));
+    
     try {
       let mediaUrls: string[] | undefined;
       let mediaTypes: ('image' | 'video')[] | undefined;
@@ -162,6 +209,8 @@ export default function CreatePostScreen() {
         },
         {
           onSuccess: async () => {
+            // Clear upload state khi thành công
+            await AsyncStorage.removeItem(UPLOAD_STATE_KEY);
             showToast("Đã đăng bài viết!", "success");
             // Đợi một chút để cache được update
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -169,17 +218,29 @@ export default function CreatePostScreen() {
             // Cache đã được update, query sẽ tự động hiển thị post mới
             router.replace("/(tabs)/home");
           },
-          onError: (error: any) => {
+          onError: async (error: any) => {
+            // Clear upload state khi có lỗi
+            await AsyncStorage.removeItem(UPLOAD_STATE_KEY);
             const { message } = showErrorFromException(error, "Không thể đăng bài viết");
             showToast(message, "error");
           },
         }
       );
     } catch (error: any) {
+      // Clear upload state khi có lỗi
+      await AsyncStorage.removeItem(UPLOAD_STATE_KEY);
       const { message } = showErrorFromException(error, "Không thể upload media");
       showToast(message, "error");
     } finally {
       setIsUploading(false);
+      // Update state trong AsyncStorage
+      const updatedState: UploadState = {
+        isUploading: false,
+        media,
+        content,
+        visibility,
+      };
+      await AsyncStorage.setItem(UPLOAD_STATE_KEY, JSON.stringify(updatedState));
     }
   };
 
@@ -327,14 +388,29 @@ export default function CreatePostScreen() {
                           color="#fff" 
                         />
                       </View>
-                      <TouchableOpacity
-                        style={styles.removeMediaButton}
-                        onPress={() => handleRemoveMedia(index)}
-                      >
-                        <Ionicons name="close-circle" size={24} color={Colors.error} />
-                      </TouchableOpacity>
+                      {isUploading && (
+                        <View style={styles.uploadingOverlay}>
+                          <ActivityIndicator size="small" color={Colors.primary} />
+                        </View>
+                      )}
+                      {!isUploading && (
+                        <TouchableOpacity
+                          style={styles.removeMediaButton}
+                          onPress={() => handleRemoveMedia(index)}
+                        >
+                          <Ionicons name="close-circle" size={24} color={Colors.error} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ))}
+                </View>
+              )}
+              
+              {/* Hiển thị trạng thái upload */}
+              {isUploading && (
+                <View style={styles.uploadingContainer}>
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                  <Text style={styles.uploadingText}>Đang upload ảnh/video...</Text>
                 </View>
               )}
 
@@ -480,11 +556,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 12,
   },
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
   uploadingContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
+    marginTop: Spacing.sm,
   },
   uploadingText: {
     fontSize: FontSizes.sm,
